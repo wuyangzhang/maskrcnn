@@ -403,9 +403,9 @@ class ResNet(nn.Module):
         units = []
         for stage_name in self.stages:
             x, cost, used_unit= getattr(self, stage_name)(x)
-            total = 0
-            for i in range(len(x.shape)):
-                total *= x.shape[i]
+            total = 1
+            for i in range(len(cost.shape)):
+                total *= cost.shape[i]
             ponder_cost += torch.sum(cost) / total
             units.append(used_unit)
             if self.return_features[stage_name]:
@@ -522,7 +522,7 @@ class Block(nn.Module):
 
         # important parameters.
         self.ponder_weight = 0.005
-        
+
         for i in range(block_count):
 
             name = "block" + str(i+1)
@@ -550,18 +550,27 @@ class Block(nn.Module):
 
         for index, name in enumerate(self.block_name):
 
+            # halting_proba should be in the range (0,1)
             x, halting_proba = getattr(self, name)(x)
+            for i in range(len(halting_proba)):
+                minval = halting_proba[i].clone().min()
+                halting_proba[i] = halting_proba[i] - minval
+                mrange = halting_proba[i].clone().max() - minval
+                if mrange > 0:
+                    halting_proba[i] = halting_proba[i].clone()/mrange + halting_proba[i] - halting_proba[i]
+                else:
+                    halting_proba[i] = halting_proba[i] - halting_proba[i]
 
-            # todo: check whether it stops at position i, j? if true, skip.
+            # todo: check whether it stops at a spatial position i, j? if true, skip.
             # should pass a mask to self.unit
             if not index:
                 shape = [x.shape[0], 1, x.shape[2], x.shape[3]]
-                self.sact_params = defaultdict()
-                self.sact_params['halting_cumsum'] = torch.zeros(shape)
-                self.sact_params['element_finished'] = torch.zeros(shape)
-                self.sact_params['remainder'] = torch.ones(shape)
-                self.sact_params['ponder_cost'] = torch.ones(shape)
-                self.sact_params['num_unit'] = torch.zeros(shape, dtype=torch.int32)
+
+                self.halting_cumsum = torch.zeros(shape)
+                self.element_finished = torch.zeros(shape)
+                self.remainder = torch.ones(shape)
+                self.ponder_cost = torch.ones(shape)
+                self.num_unit = torch.zeros(shape, dtype=torch.int32)
 
             # always halting at the last unit
             if index == len(self.block_name) - 1:
@@ -569,39 +578,39 @@ class Block(nn.Module):
             else:
                 halting_proba = halting_proba.cpu()
 
-            self.sact_params['halting_cumsum'] += halting_proba
-            cur_elements_finished = (self.sact_params['halting_cumsum'] >= 1 - self.eps)
+            self.halting_cumsum += halting_proba
+            cur_elements_finished = (self.halting_cumsum >= 1 - self.eps)
             #halting_proba = torch.where(cur_elements_finished, torch.zeros(x.shape), halting_proba)
 
             # find positions which have halted at the current unit
-            just_finished = cur_elements_finished & (self.sact_params['element_finished'] == False)
+            just_finished = cur_elements_finished & (self.element_finished == False)
 
             # see paper equation 9
             # for such positions, the halting distribution value is the remainder,
             # for others not finished yet, it is the halting probability
-            cur_halting_dist = torch.where(just_finished, self.sact_params['remainder'], halting_proba)
+            cur_halting_dist = torch.where(just_finished, self.remainder, halting_proba)
 
             # see equation 11 in the paper
             # Since R (remainder) is a fixed value, we add it to ponder cost at the end.
             # If it has been finished before the current step, we add 0.
             # If it is not done yet, we add 1 to to N.
-            self.sact_params['ponder_cost'] += torch.where(cur_elements_finished,
-                                                           torch.where(just_finished, self.sact_params['remainder'], torch.zeros(shape)),
+            self.ponder_cost += torch.where(cur_elements_finished,
+                                                           torch.where(just_finished, self.remainder, torch.zeros(shape)),
                                                            torch.ones(shape)) * self.ponder_weight
 
-            self.sact_params['num_unit'] += (self.sact_params['element_finished'] == False).type(torch.int32) #need to consider shape!
+            self.num_unit += (self.element_finished == False).type(torch.int32) #need to consider shape!
 
             if index == 0:
                 output = x * cur_halting_dist.cuda()
             else:
                 output = output + x * cur_halting_dist.cuda()
 
-            self.sact_params['remainder'] -= halting_proba
+            self.remainder -= halting_proba
 
-            self.sact_params['element_finished'] = cur_elements_finished
+            self.element_finished = cur_elements_finished
 
-        return output, self.sact_params['ponder_cost'], self.sact_params['num_unit']
-
+        return output, self.ponder_cost, self.num_unit
+        # return x, self.ponder_cost, self.num_unit
 
 class Bottleneck(nn.Module):
     def __init__(
@@ -687,12 +696,16 @@ class Bottleneck(nn.Module):
         )
         self.bn3 = norm_func(out_channels)
 
-        for l in [self.conv1, self.conv3,]:
-            nn.init.kaiming_uniform_(l.weight, a=1)
-
         self.conv4 = Conv2d(
             out_channels, 1, kernel_size=3, padding=dilation, bias=False
         )
+
+        for l in [self.conv1, self.conv3 ]:
+            nn.init.kaiming_uniform_(l.weight, a=1)
+
+        nn.init.kaiming_uniform_(self.conv4.weight, a=1)
+
+        self.bn4 = norm_func(1)
 
     def forward(self, x):
         identity = x
@@ -715,7 +728,7 @@ class Bottleneck(nn.Module):
         out = F.relu_(out)
 
         halting_cost = self.conv4(out)
-
+        halting_cost = self.bn4(halting_cost)
         return out, halting_cost
 
 
