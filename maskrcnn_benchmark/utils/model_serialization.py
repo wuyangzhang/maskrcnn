@@ -26,15 +26,21 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
     loaded_keys = sorted(list(loaded_state_dict.keys()))
 
     # wz modify:
-    current_index = 0
+    logger = logging.getLogger(__name__)
     for loaded_key in loaded_keys:
         if 'layer' not in loaded_key:
             continue
-        while current_index < len(current_keys):
-            if current_keys[current_index].endswith(loaded_key):
-                model_state_dict[current_keys[current_index]] = loaded_state_dict[loaded_key]
+        _loaded_key = loaded_key
+        loaded_key = loaded_key.split('.')
+        loaded_key[1] = 'block' + str(int(loaded_key[1]) + 1)
+        loaded_key = '.'.join(loaded_key)
+        for current_key in current_keys:
+            if loaded_key in current_key:
+                model_state_dict[current_key] = loaded_state_dict[_loaded_key]
+                logger.info(
+                    'load {} to {}'.format(_loaded_key, current_key)
+                )
                 break
-            current_index += 1
     # get a matrix of string matches, where each (i, j) entry correspond to the size of the
     # loaded_key string, if it matches
     # match_matrix = [
