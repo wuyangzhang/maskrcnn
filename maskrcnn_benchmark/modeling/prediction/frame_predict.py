@@ -30,25 +30,37 @@ class VideoNet(torch.nn.Module):
 
         self.convlstm = ConvLSTM(input_size=(height, width),
                  input_dim=channels,
-                 hidden_dim=[64, 64, 128],
+                 hidden_dim=[64, 64, 16],
                  kernel_size=(3, 3),
                  num_layers=3,
                  batch_first=True,
                  bias=True,
                  return_all_layers=False)
 
+        self.convlstm2 = ConvLSTM(input_size=(height, width),
+                                 input_dim=cfg.PREDICTION.SEQ_LEN,
+                                 hidden_dim=[64, 64, 16],
+                                 kernel_size=(3, 3),
+                                 num_layers=3,
+                                 batch_first=True,
+                                 bias=True,
+                                 return_all_layers=False)
+
         self.conv1 = torch.nn.Conv3d(in_channels=cfg.PREDICTION.SEQ_LEN, out_channels=1, kernel_size=3, stride=1,
                                      padding=1)
 
-        self.conv2 = torch.nn.Conv2d(in_channels=128, out_channels=3, kernel_size=3, stride=1, padding=1)
+        self.conv2 = torch.nn.Conv2d(in_channels=16, out_channels=3, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
 
         # need to reduce the high dimension...
         #  torch.Size([2, 5, 128, 224, 224])
+        start = time.time()
         x = self.convlstm(x)[0][0]
+        x = self.convlstm2(x)[0][0]
         x = self.conv1(x).squeeze(1)
         x = self.conv2(x)
+        print('time {}'.format(time.time()-start))
         return x
 
 def train(cfg):
@@ -135,11 +147,10 @@ def main():
         help="path to config file",
         type=str,
     )
+
+
     args = parser.parse_args()
     cfg.merge_from_file(args.config_file)
     cfg.freeze()
     train(cfg)
 
-
-if __name__ == "__main__":
-    main()

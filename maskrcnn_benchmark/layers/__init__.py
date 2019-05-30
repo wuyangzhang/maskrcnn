@@ -2,6 +2,7 @@
 import torch
 
 from .batch_norm import FrozenBatchNorm2d
+from .convlstm import ConvLSTM
 from .misc import Conv2d
 from .misc import DFConv2d
 from .misc import ConvTranspose2d
@@ -19,7 +20,6 @@ from .dcn.deform_conv_module import DeformConv, ModulatedDeformConv, ModulatedDe
 from .dcn.deform_pool_func import deform_roi_pooling
 from .dcn.deform_pool_module import DeformRoIPooling, DeformRoIPoolingPack, ModulatedDeformRoIPoolingPack
 
-
 __all__ = [
     "nms",
     "roi_align",
@@ -33,6 +33,7 @@ __all__ = [
     "interpolate",
     "BatchNorm2d",
     "FrozenBatchNorm2d",
+    'ConvLSTM',
     "SigmoidFocalLoss",
     'deform_conv',
     'modulated_deform_conv',
