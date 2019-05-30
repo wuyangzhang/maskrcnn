@@ -30,7 +30,7 @@ class VideoNet(torch.nn.Module):
 
         self.convlstm = ConvLSTM(input_size=(height, width),
                  input_dim=channels,
-                 hidden_dim=[64, 64, 16],
+                 hidden_dim=[32, 32, 16],
                  kernel_size=(3, 3),
                  num_layers=3,
                  batch_first=True,
@@ -38,8 +38,8 @@ class VideoNet(torch.nn.Module):
                  return_all_layers=False)
 
         self.convlstm2 = ConvLSTM(input_size=(height, width),
-                                 input_dim=cfg.PREDICTION.SEQ_LEN,
-                                 hidden_dim=[64, 64, 16],
+                                 input_dim=16,
+                                 hidden_dim=[32, 32, 16],
                                  kernel_size=(3, 3),
                                  num_layers=3,
                                  batch_first=True,
@@ -57,10 +57,11 @@ class VideoNet(torch.nn.Module):
         #  torch.Size([2, 5, 128, 224, 224])
         start = time.time()
         x = self.convlstm(x)[0][0]
-        x = self.convlstm2(x)[0][0]
+        print('time {}'.format(time.time() - start))
+        #x = self.convlstm2(x)[0][0]
         x = self.conv1(x).squeeze(1)
         x = self.conv2(x)
-        print('time {}'.format(time.time()-start))
+        #print('time {}'.format(time.time()-start))
         return x
 
 def train(cfg):
@@ -102,8 +103,8 @@ def _train(train_loader, model, loss_fn, optimizer, lr):
 
     for it, (input, label) in enumerate(train_loader):
         loss = 0
-        input = input.cuda(async=True)
-        label = label.cuda(async=True)
+        input = input.cuda()
+        label = label.cuda()
         #model.train()
 
         output = model(input)#.cuda())
