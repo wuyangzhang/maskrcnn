@@ -86,6 +86,15 @@ _C.DATALOADER.ASPECT_RATIO_GROUPING = True
 
 
 # ---------------------------------------------------------------------------- #
+# prediction options
+# ---------------------------------------------------------------------------- #
+_C.PREDICTION = CN()
+_C.PREDICTION.BATCH = 1
+_C.PREDICTION.SEQ_LEN = 5
+_C.PREDICTION.EPOCHS = 20000
+_C.PREDICTION.LEARNINGRATE = 0.001
+_C.PREDICTION.SAVE_ITER = 20
+# ---------------------------------------------------------------------------- #
 # Backbone options
 # ---------------------------------------------------------------------------- #
 _C.MODEL.BACKBONE = CN()
@@ -108,7 +117,6 @@ _C.MODEL.BACKBONE.USE_GN = False
 _C.MODEL.FPN = CN()
 _C.MODEL.FPN.USE_GN = False
 _C.MODEL.FPN.USE_RELU = False
-
 
 # ---------------------------------------------------------------------------- #
 # Group Norm options
