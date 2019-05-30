@@ -15,10 +15,17 @@ def main():
     )
 
 
+    parser.add_argument(
+        "--dataset",
+        default='',
+        metavar='FILE',
+        type=str,
+    )
+
     args = parser.parse_args()
     cfg.merge_from_file(args.config_file)
     cfg.freeze()
-    train(cfg)
+    train(cfg,args.dataset)
 
 
 if __name__ == "__main__":

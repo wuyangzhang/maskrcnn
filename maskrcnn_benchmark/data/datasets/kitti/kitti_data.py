@@ -65,9 +65,9 @@ class KITTIDataset(Dataset):
         return self.length
 
 
-def get_loader(seq_length=5, batch_size=1):
+def get_loader(dataset, seq_length=5, batch_size=1):
 
-    root_dir = '/home/wuyang/data_tracking/training/'
+    root_dir = dataset
     class_paths = [d.path for d in os.scandir(root_dir) if d.is_dir]
     class_image_paths = []
     end_idx = []

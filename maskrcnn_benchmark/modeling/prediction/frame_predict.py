@@ -55,19 +55,17 @@ class VideoNet(torch.nn.Module):
 
         # need to reduce the high dimension...
         #  torch.Size([2, 5, 128, 224, 224])
-        start = time.time()
         x = self.convlstm(x)[0][0]
-        print('time {}'.format(time.time() - start))
         #x = self.convlstm2(x)[0][0]
         x = self.conv1(x).squeeze(1)
         x = self.conv2(x)
         #print('time {}'.format(time.time()-start))
         return x
 
-def train(cfg):
+def train(cfg, dataset):
 
     # Load data
-    train_loader = get_loader(seq_length=cfg.PREDICTION.SEQ_LEN, batch_size=cfg.PREDICTION.BATCH)
+    train_loader = get_loader(dataset, seq_length=cfg.PREDICTION.SEQ_LEN, batch_size=cfg.PREDICTION.BATCH)
 
     # Build the model
     model = VideoNet(cfg)
@@ -149,9 +147,8 @@ def main():
         type=str,
     )
 
-
     args = parser.parse_args()
     cfg.merge_from_file(args.config_file)
     cfg.freeze()
-    train(cfg)
+    train(cfg, args.dataset)
 
