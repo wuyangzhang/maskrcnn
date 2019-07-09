@@ -12,7 +12,7 @@ def main():
     parser = argparse.ArgumentParser(description="PyTorch Object Detection Webcam Demo")
     parser.add_argument(
         "--config-file",
-        default="../configs/caffe2/e2e_mask_rcnn_R_50_FPN_1x_caffe2.yaml",
+        default="../configs/e2e_mask_rcnn_R_50_FPN_1x.yaml",
         metavar="FILE",
         help="path to config file",
     )
@@ -64,91 +64,91 @@ def main():
         min_image_size=args.min_image_size,
     )
 
-    # cam = cv2.VideoCapture(0)
-    # while True:
-    #     start_time = time.time()
-    #     ret_val, img = cam.read()
-    #     composite = coco_demo.run_on_opencv_image(img)
-    #     print("Time: {:.2f} s / img".format(time.time() - start_time))
-    #     cv2.imshow("COCO detections", composite)
-    #     if cv2.waitKey(1) == 27:
-    #         break  # esc to quit
-    # cv2.destroyAllWindows()
+    cam = cv2.VideoCapture(0)
+    while True:
+        start_time = time.time()
+        ret_val, img = cam.read()
+        composite, bbox, units = coco_demo.run_on_opencv_image(img)
+        print("Time: {:.2f} s / img".format(time.time() - start_time))
+        cv2.imshow("COCO detections", composite)
+        if cv2.waitKey(1) == 27:
+            break  # esc to quit
+    cv2.destroyAllWindows()
 
-    cap = cv2.VideoCapture('/home/wuyang/maskrcnn-benchmark/demo/project.avi')
-
-    fps = 30
-
-    seconds = 60 * 5
-
-    total_frame = fps * seconds
-
-    img1 = cap.read()[1]
-
-    height, width, layers = img1.shape
-
-    size = (width, height)
+    # cap = cv2.VideoCapture('/home/wuyang/maskrcnn-benchmark/demo/project.avi')
     #
+    # fps = 30
+    #
+    # seconds = 60 * 5
+    #
+    # total_frame = fps * seconds
+    #
+    # img1 = cap.read()[1]
+    #
+    # height, width, layers = img1.shape
+    #
+    # size = (width, height)
+    # #
+    # # while (cap.isOpened()):
+    # #     # Capture frame-by-frame
+    # #     ret, frame = cap.read()
+    # #     if ret == True:
+    # #
+    # #         # Display the resulting frame
+    # #         cv2.imshow('Frame', frame)
+    # #
+    # #         # Press Q on keyboard to  exit
+    # #         if cv2.waitKey(25) & 0xFF == ord('q'):
+    # #             break
+    # #
+    # #     # Break the loop
+    # #     else:
+    # #         break
+    # #
+    # # # When everything done, release the video capture object
+    # # cap.release()
+    #
+    #
+    # video = cv2.VideoWriter('project-mask.avi', cv2.VideoWriter_fourcc(*'DIVX'), 30, size)
+    #
+    #
+    # i = 1
+    #
+    # latency = []
+    # import time
     # while (cap.isOpened()):
     #     # Capture frame-by-frame
     #     ret, frame = cap.read()
     #     if ret == True:
     #
     #         # Display the resulting frame
-    #         cv2.imshow('Frame', frame)
-    #
+    #         #cv2.imshow('Frame', frame)
+    #         start = time.time()
+    #         composite = coco_demo.run_on_opencv_image(frame)
+    #         cost = time.time() - start
+    #         latency.append(cost)
+    #         print(cost)
+    #         cv2.imshow("COCO detections", composite)
+    #         video.write(composite)
     #         # Press Q on keyboard to  exit
-    #         if cv2.waitKey(25) & 0xFF == ord('q'):
+    #         if cv2.waitKey(25) & 0xFF == ord('q') or i == 3600:
     #             break
-    #
+    #         print(i)
+    #         i+=1
     #     # Break the loop
     #     else:
     #         break
     #
+    # with open('your_file.txt', 'w') as f:
+    #     for item in latency:
+    #         f.write("%s\n" % item)
+    #
     # # When everything done, release the video capture object
     # cap.release()
-
-
-    video = cv2.VideoWriter('project-mask.avi', cv2.VideoWriter_fourcc(*'DIVX'), 30, size)
-
-
-    i = 1
-
-    latency = []
-    import time
-    while (cap.isOpened()):
-        # Capture frame-by-frame
-        ret, frame = cap.read()
-        if ret == True:
-
-            # Display the resulting frame
-            #cv2.imshow('Frame', frame)
-            start = time.time()
-            composite = coco_demo.run_on_opencv_image(frame)
-            cost = time.time() - start
-            latency.append(cost)
-            print(cost)
-            cv2.imshow("COCO detections", composite)
-            video.write(composite)
-            # Press Q on keyboard to  exit
-            if cv2.waitKey(25) & 0xFF == ord('q') or i == 3600:
-                break
-            print(i)
-            i+=1
-        # Break the loop
-        else:
-            break
-
-    with open('your_file.txt', 'w') as f:
-        for item in latency:
-            f.write("%s\n" % item)
-
-    # When everything done, release the video capture object
-    cap.release()
-    video.release()
-
-    # Closes all the frames
-    cv2.destroyAllWindows()
+    # video.release()
+    #
+    # # Closes all the frames
+    # cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":

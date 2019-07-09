@@ -25,22 +25,127 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
     current_keys = sorted(list(model_state_dict.keys()))
     loaded_keys = sorted(list(loaded_state_dict.keys()))
 
-    # wz modify:
     logger = logging.getLogger(__name__)
-    for loaded_key in loaded_keys:
-        if 'layer' not in loaded_key:
-            continue
-        _loaded_key = loaded_key
-        loaded_key = loaded_key.split('.')
-        loaded_key[1] = 'block' + str(int(loaded_key[1]) + 1)
-        loaded_key = '.'.join(loaded_key)
-        for current_key in current_keys:
-            if loaded_key in current_key:
-                model_state_dict[current_key] = loaded_state_dict[_loaded_key]
+    valid_cnt = 0
+    if len(current_keys) == len(loaded_keys):
+        for curr_key in current_keys:
+            valid_cnt += 1
+            model_state_dict[curr_key] = loaded_state_dict[curr_key]
+            logger.info(
+                'load {} to {}'.format(curr_key, curr_key)
+            )
+
+    elif 'module' in current_keys[0]:
+        for curr_key in current_keys:
+            # case 1: backbone.body
+            origin = curr_key
+            curr_key = curr_key.split('.')[1:]
+            curr_key = '.'.join(curr_key)
+
+            if 'backbone.body.layer' in curr_key:
+
+                mapper = curr_key.split('.')[2:]
+                mapper[1] = str(int(mapper[1][-1]) - 1)
+                mapper = '.'.join(mapper)
+                if mapper in loaded_keys:
+                    valid_cnt += 1
+                    model_state_dict[origin] = loaded_state_dict[mapper]
+                    logger.info(
+                        'load {} to {}'.format(curr_key, mapper)
+                    )
+                continue
+
+            if curr_key in loaded_keys:
+                valid_cnt += 1
+                model_state_dict[origin] = loaded_state_dict[curr_key]
                 logger.info(
-                    'load {} to {}'.format(_loaded_key, current_key)
+                    'load {} to {}'.format(curr_key, curr_key)
                 )
-                break
+                continue
+
+            mapper = curr_key.split('.')[2:]
+            mapper = '.'.join(mapper)
+            if mapper in loaded_keys:
+                valid_cnt += 1
+                model_state_dict[origin] = loaded_state_dict[mapper]
+                logger.info(
+                    'load {} to {}'.format(curr_key, mapper)
+                )
+                continue
+
+            mapper = curr_key.split('.')[3:]
+            mapper = '.'.join(mapper)
+            if mapper in loaded_keys:
+                valid_cnt += 1
+                model_state_dict[origin] = loaded_state_dict[mapper]
+                logger.info(
+                    'load {} to {}'.format(curr_key, mapper)
+                )
+                continue
+    else:
+        for curr_key in current_keys:
+            # case 1: backbone.body
+
+            if 'backbone.body.layer' in curr_key:
+
+                mapper = curr_key.split('.')[2:]
+                mapper[1] = str(int(mapper[1][-1]) - 1)
+                mapper = '.'.join(mapper)
+                if mapper in loaded_keys:
+                    valid_cnt += 1
+                    model_state_dict[curr_key] = loaded_state_dict[mapper]
+                    logger.info(
+                                    'load {} to {}'.format(curr_key, mapper)
+                                )
+                continue
+
+            if curr_key in loaded_keys:
+                valid_cnt += 1
+                model_state_dict[curr_key] = loaded_state_dict[curr_key]
+                logger.info(
+                    'load {} to {}'.format(curr_key, curr_key)
+                )
+                continue
+
+            mapper = curr_key.split('.')[2:]
+            mapper = '.'.join(mapper)
+            if mapper in loaded_keys:
+                valid_cnt += 1
+                model_state_dict[curr_key] = loaded_state_dict[mapper]
+                logger.info(
+                    'load {} to {}'.format(curr_key, mapper)
+                )
+                continue
+
+            mapper = curr_key.split('.')[3:]
+            mapper = '.'.join(mapper)
+            if mapper in loaded_keys:
+                valid_cnt += 1
+                model_state_dict[curr_key] = loaded_state_dict[mapper]
+                logger.info(
+                    'load {} to {}'.format(curr_key, mapper)
+                )
+                continue
+
+    logger.info('totally load {} parameters'.format(valid_cnt))
+
+    # wz modify:
+    # logger = logging.getLogger(__name__)
+    # for loaded_key in loaded_keys:
+    #     if 'layer' not in loaded_key:
+    #         continue
+    #     _loaded_key = loaded_key
+    #     loaded_key = loaded_key.split('.')
+    #     loaded_key[1] = 'block' + str(int(loaded_key[1]) + 1)
+    #     loaded_key = '.'.join(loaded_key)
+    #     for current_key in current_keys:
+    #         if loaded_key in current_key:
+    #             model_state_dict[current_key] = loaded_state_dict[_loaded_key]
+    #             logger.info(
+    #                 'load {} to {}'.format(_loaded_key, current_key)
+    #             )
+    #             break
+
     # get a matrix of string matches, where each (i, j) entry correspond to the size of the
     # loaded_key string, if it matches
     # match_matrix = [

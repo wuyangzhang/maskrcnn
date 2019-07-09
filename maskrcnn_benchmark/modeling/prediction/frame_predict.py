@@ -2,11 +2,11 @@ import argparse
 import time
 from datetime import timedelta
 import datetime
-
+import matplotlib.pyplot as plt
 import torch
 import torch.nn
 from maskrcnn_benchmark.config import cfg
-from maskrcnn_benchmark.layers.convlstm import ConvLSTM
+from prediction.convlstm import ConvLSTM
 from maskrcnn_benchmark.data.datasets.kitti.kitti_data import get_loader
 
 # data load..
@@ -62,6 +62,45 @@ class VideoNet(torch.nn.Module):
         #print('time {}'.format(time.time()-start))
         return x
 
+class WorkloadDistPrediction():
+    def __init__(self, cfg):
+        self.model = VideoNet(cfg).cuda()
+        self.model.eval()
+
+    def run(self, bbox, unit):
+        for i in range(len(bbox)):
+            bbox.append(unit)
+        return self.model(bbox)
+
+def test(cfg, dataset, model_path):
+    test_loader = get_loader(dataset, seq_length=cfg.PREDICTION.SEQ_LEN, batch_size=1)
+    model = VideoNet(cfg).cuda()
+    model.load_state_dict(torch.load(model_path)['state_dict'])
+    model.eval()
+
+
+    for it, (input, label) in enumerate(test_loader):
+        loss = 0
+        input = input.cuda()
+        label = label.cuda()
+
+        output = model(input)  # .cuda())
+        fig, axs = plt.subplots(nrows=2, ncols=2)
+        input = input.cpu()[0]
+        i = 1
+
+        for ax in axs.ravel():
+            x = input[i].permute(1,2,0).detach().numpy()
+            ax.imshow(x)
+            i += 1
+        plt.show()
+        label = label.cpu()[0].permute(1,2,0).numpy()
+        output = output.cpu()[0].permute(1,2,0).detach().numpy()
+        plt.imshow(label)
+        plt.show()
+        plt.imshow(output)
+        plt.show()
+
 def train(cfg, dataset):
 
     # Load data
@@ -100,10 +139,10 @@ def _train(train_loader, model, loss_fn, optimizer, lr):
     total_loss = {'mse': 0}
 
     for it, (input, label) in enumerate(train_loader):
-        loss = 0
+        loss = None
         input = input.cuda()
         label = label.cuda()
-        #model.train()
+        model.train()
 
         output = model(input)#.cuda())
         mse_loss = loss_fn(output, label)

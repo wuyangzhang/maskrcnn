@@ -30,6 +30,7 @@ class GeneralizedRCNN(nn.Module):
         self.rpn = build_rpn(cfg, self.backbone.out_channels)
         self.roi_heads = build_roi_heads(cfg, self.backbone.out_channels)
         self.times = []
+
     def forward(self, images, targets=None):
         """
         Arguments:
@@ -71,4 +72,4 @@ class GeneralizedRCNN(nn.Module):
             losses.update(proposal_losses)
             return losses
 
-        return result
+        return result, ponder_cost, units

@@ -2,7 +2,6 @@
 import torch
 
 from .batch_norm import FrozenBatchNorm2d
-from .convlstm import ConvLSTM
 from .misc import Conv2d
 from .misc import DFConv2d
 from .misc import ConvTranspose2d
@@ -33,7 +32,6 @@ __all__ = [
     "interpolate",
     "BatchNorm2d",
     "FrozenBatchNorm2d",
-    'ConvLSTM',
     "SigmoidFocalLoss",
     'deform_conv',
     'modulated_deform_conv',

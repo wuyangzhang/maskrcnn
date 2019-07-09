@@ -150,6 +150,7 @@ def make_data_loader(cfg, is_train=True, is_distributed=False, start_iter=0):
     DatasetCatalog = paths_catalog.DatasetCatalog
     dataset_list = cfg.DATASETS.TRAIN if is_train else cfg.DATASETS.TEST
 
+    # transforms = None if not is_train and cfg.TEST.BBOX_AUG.ENABLED else build_transforms(cfg, is_train)
     transforms = build_transforms(cfg, is_train)
     datasets = build_dataset(dataset_list, transforms, DatasetCatalog, is_train)
 

@@ -2,13 +2,48 @@
 import cv2
 import torch
 from torchvision import transforms as T
-
+from torchvision.transforms import functional as F
 from maskrcnn_benchmark.modeling.detector import build_detection_model
 from maskrcnn_benchmark.utils.checkpoint import DetectronCheckpointer
 from maskrcnn_benchmark.structures.image_list import to_image_list
 from maskrcnn_benchmark.modeling.roi_heads.mask_head.inference import Masker
 from maskrcnn_benchmark import layers as L
 from maskrcnn_benchmark.utils import cv2_util
+
+class Resize(object):
+    def __init__(self, min_size, max_size):
+        self.min_size = min_size
+        self.max_size = max_size
+
+    # modified from torchvision to add support for max size
+    def get_size(self, image_size):
+        # example; max_size = 1333, min_size = 800
+        w, h = image_size
+        size = self.min_size
+        max_size = self.max_size
+        if max_size is not None:
+            min_original_size = float(min((w, h)))
+            max_original_size = float(max((w, h)))
+            if max_original_size / min_original_size * size > max_size:
+                size = int(round(max_size * min_original_size / max_original_size))
+
+        if (w <= h and w == size) or (h <= w and h == size):
+            return (h, w)
+
+        if w < h:
+            ow = size
+            oh = int(size * h / w)
+        else:
+            oh = size
+            ow = int(size * w / h)
+
+        return (oh, ow)
+        # return (h, w)
+
+    def __call__(self, image):
+        size = self.get_size(image.size)
+        image = F.resize(image, size)
+        return image
 
 
 class COCODemo(object):
@@ -112,11 +147,13 @@ class COCODemo(object):
         self.model.to(self.device)
         self.min_image_size = min_image_size
 
+        # wz COCO demo initialization: load the model..
         save_dir = cfg.OUTPUT_DIR
         checkpointer = DetectronCheckpointer(cfg, self.model, save_dir=save_dir)
         _ = checkpointer.load(cfg.MODEL.WEIGHT)
 
         self.transforms = self.build_transform()
+        self.transforms_not_resize = self.build_transform(resize=False)
 
         mask_threshold = -1 if show_mask_heatmaps else 0.5
         self.masker = Masker(threshold=mask_threshold, padding=1)
@@ -129,7 +166,7 @@ class COCODemo(object):
         self.show_mask_heatmaps = show_mask_heatmaps
         self.masks_per_dim = masks_per_dim
 
-    def build_transform(self):
+    def build_transform(self, resize=True):
         """
         Creates a basic transformation that was used to train the models
         """
@@ -147,19 +184,30 @@ class COCODemo(object):
         normalize_transform = T.Normalize(
             mean=cfg.INPUT.PIXEL_MEAN, std=cfg.INPUT.PIXEL_STD
         )
-
-        transform = T.Compose(
-            [
-                T.ToPILImage(),
-                T.Resize(self.min_image_size),
-                T.ToTensor(),
-                to_bgr_transform,
-                normalize_transform,
-            ]
-        )
+        min_size = cfg.INPUT.MIN_SIZE_TEST
+        max_size = cfg.INPUT.MAX_SIZE_TEST
+        if resize:
+            transform = T.Compose(
+                [
+                    T.ToPILImage(),
+                    Resize(min_size, max_size),
+                    T.ToTensor(),
+                    to_bgr_transform,
+                    normalize_transform,
+                ]
+            )
+        else:
+            transform = T.Compose(
+                [
+                    T.ToPILImage(),
+                    T.ToTensor(),
+                    to_bgr_transform,
+                    normalize_transform,
+                ]
+            )
         return transform
 
-    def run_on_opencv_image(self, image):
+    def run_on_opencv_image(self, image, resize=True):
         """
         Arguments:
             image (np.ndarray): an image as returned by OpenCV
@@ -169,7 +217,7 @@ class COCODemo(object):
                 of the detection properties can be found in the fields of
                 the BoxList via `prediction.fields()`
         """
-        predictions = self.compute_prediction(image)
+        predictions, units = self.compute_prediction(image, resize)
         top_predictions = self.select_top_predictions(predictions)
 
         result = image.copy()
@@ -182,9 +230,22 @@ class COCODemo(object):
             result = self.overlay_keypoints(result, top_predictions)
         result = self.overlay_class_names(result, top_predictions)
 
+        return result, top_predictions, units
+
+    def overlay(self, image, predictions, dist=False):
+        result = image.copy()
+        if self.show_mask_heatmaps:
+            return self.create_mask_montage(result, predictions)
+        result = self.overlay_boxes(result, predictions)
+        if self.cfg.MODEL.MASK_ON:
+            result = self.overlay_mask(result, predictions, dist)
+        if self.cfg.MODEL.KEYPOINT_ON:
+            result = self.overlay_keypoints(result, predictions)
+        result = self.overlay_class_names(result, predictions)
         return result
 
-    def compute_prediction(self, original_image):
+
+    def compute_prediction(self, original_image, resize=True):
         """
         Arguments:
             original_image (np.ndarray): an image as returned by OpenCV
@@ -194,15 +255,21 @@ class COCODemo(object):
                 of the detection properties can be found in the fields of
                 the BoxList via `prediction.fields()`
         """
+
         # apply pre-processing to image
-        image = self.transforms(original_image)
+        #todo: check the impact of resizing images
+        if resize:
+            image = self.transforms(original_image)
+        else:
+            image = self.transforms_not_resize(original_image)
         # convert to an ImageList, padded so that it is divisible by
         # cfg.DATALOADER.SIZE_DIVISIBILITY
         image_list = to_image_list(image, self.cfg.DATALOADER.SIZE_DIVISIBILITY)
+        # offload image to gpu
         image_list = image_list.to(self.device)
         # compute predictions
         with torch.no_grad():
-            predictions = self.model(image_list)
+            predictions, pondercost, units = self.model(image_list)
         predictions = [o.to(self.cpu_device) for o in predictions]
 
         # always single image is passed at a time
@@ -219,7 +286,7 @@ class COCODemo(object):
             # always single image is passed at a time
             masks = self.masker([masks], [prediction])[0]
             prediction.add_field("mask", masks)
-        return prediction
+        return prediction, units
 
     def select_top_predictions(self, predictions):
         """
@@ -273,7 +340,7 @@ class COCODemo(object):
 
         return image
 
-    def overlay_mask(self, image, predictions):
+    def overlay_mask(self, image, predictions, isContours=False):
         """
         Adds the instances contours for each predicted object.
         Each label has a different color.
@@ -283,19 +350,30 @@ class COCODemo(object):
             predictions (BoxList): the result of the computation by the model.
                 It should contain the field `mask` and `labels`.
         """
-        masks = predictions.get_field("mask").numpy()
-        labels = predictions.get_field("labels")
 
-        colors = self.compute_colors_for_labels(labels).tolist()
+        if isContours:
+            masks = predictions.get_field("mask")
+            labels = predictions.get_field("labels")
+            colors = self.compute_colors_for_labels(labels).tolist()
 
-        for mask, color in zip(masks, colors):
-            thresh = mask[0, :, :, None]
-            contours, hierarchy = cv2_util.findContours(
-                thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-            )
-            image = cv2.drawContours(image, contours, -1, color, 3)
+            for mask, color in zip(masks, colors):
+                image = cv2.drawContours(image, mask, -1, color, 3)
+            composite = image
+        else:
 
-        composite = image
+            masks = predictions.get_field("mask").numpy()
+            labels = predictions.get_field("labels")
+
+            colors = self.compute_colors_for_labels(labels).tolist()
+
+            for mask, color in zip(masks, colors):
+                thresh = mask[0, :, :, None]
+                contours, hierarchy = cv2_util.findContours(
+                    thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+                )
+                image = cv2.drawContours(image, contours, -1, color, 3)
+
+            composite = image
 
         return composite
 

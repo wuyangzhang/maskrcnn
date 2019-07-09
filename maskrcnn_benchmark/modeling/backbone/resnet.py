@@ -314,6 +314,61 @@ ResNet152FPNStagesTo5 = tuple(
     for (i, c, r) in ((1, 3, True), (2, 8, True), (3, 36, True), (4, 3, True))
 )
 
+"""Spatially adaptive computation time.
+    
+    Each spatial position in the states tensor has its own halting distribution.
+    This allows to process different part of an image for a different number of
+    units.
+    
+    The code is similar to `adaptive_computation_early_stopping`. The differences
+    are:
+    1) The states are expected to be 4-D tensors (Batch-Height-Width-Channels).
+      ACT is applied for first three dimensions.
+    2) unit should have a `residual_mask` argument. It is a `float32` mask
+      with 1's corresponding to the positions which need to be updated.
+      0's should be frozen. For ResNets this can be achieved by multiplying the
+      residual branch responses by `residual_mask`.
+    3) There is no tf.cond part so the computation is not actually saved.
+    
+    Args:
+      inputs: Input states at the first unit, 4-D `Tensor` of type `float32`.
+      unit: A function. See `adaptive_computation_early_stopping` for
+        detailed explanation.
+      max_units: Maximum number of units.
+      eps: A `float` in the range [0, 1]. Small number to ensure that
+        the computation can halt after the first unit.
+      scope: variable scope or scope name in which the layers are created.
+        Defaults to 'act'.
+    
+    Returns:
+      ponder_cost: A 3-D `Tensor` of type `float32`.
+        Shape is [batch, height, width].
+        A differentiable upper bound on the number of units per spatial position.
+    
+        # wz : ponder cost will be calculated for each spatial position
+    
+      num_units: A 3-D `Tensor` of type `int32`.
+        Shape is [batch, height, width].
+        Actual number of units per spatial position that were used.
+        num_units < ponder_cost.
+    
+    
+      flops: A 1-D `Tensor` of type `int64`.
+        Number of floating point operations that were used.
+    
+    
+      halting_distribution: A 4-D `Tensor` of type `float32`.
+        Shape is `[batch, height, width, max_units]`.
+        Halting probability distribution.
+        halting_distribution[i, h, w, j] is the probability of computation
+        for i-th object at the spatial position (h, w) to halt at j-th unit.
+        Sum over the last dimension should be close to one.
+    
+    
+      outputs: A 4-D `Tensor` of shape [batch, height, width, depth]. Outputs of
+        the ACT module, intermediate states weighted by the halting distribution
+        tensor.
+"""
 class ResNet(nn.Module):
     def __init__(self, cfg):
         super(ResNet, self).__init__()
@@ -326,7 +381,7 @@ class ResNet(nn.Module):
         stem_module = _STEM_MODULES[cfg.MODEL.RESNETS.STEM_FUNC]
         stage_specs = _STAGE_SPECS[cfg.MODEL.BACKBONE.CONV_BODY]
         transformation_module = _TRANSFORMATION_MODULES[cfg.MODEL.RESNETS.TRANS_FUNC]
-
+        self.sact_weight = 0.01
         # Construct the stem module
         self.stem = stem_module(cfg)
 
@@ -383,7 +438,7 @@ class ResNet(nn.Module):
             self.return_features[name] = stage_spec.return_features
 
         # Optionally freeze (requires_grad=False) parts of the backbone
-        self._freeze_backbone(cfg.MODEL.BACKBONE.FREEZE_CONV_BODY_AT)
+        # self._freeze_backbone(cfg.MODEL.BACKBONE.FREEZE_CONV_BODY_AT)
 
     def _freeze_backbone(self, freeze_at):
         if freeze_at < 0:
@@ -399,18 +454,23 @@ class ResNet(nn.Module):
     def forward(self, x):
         outputs = []
         x = self.stem(x)
-        ponder_cost = 0
+        ponder_cost_sum = 0
         units = []
         for stage_name in self.stages:
-            x, cost, used_unit= getattr(self, stage_name)(x)
-            total = 1
-            for i in range(len(cost.shape)):
-                total *= cost.shape[i]
-            ponder_cost += torch.sum(cost) / total
-            units.append(used_unit)
+            # if stage_name == 'layer1':
+            #     block = getattr(self, 'layer1')
+            #     print(block.block1.conv4.weight)
+            x, ponder_cost, used_unit= getattr(self, stage_name)(x)
+            # total = 1
+            # for i in range(len(ponder_cost.shape)):
+            #     total *= ponder_cost.shape[i]
+            # ponder_cost_sum += torch.sum(ponder_cost) / total
+            ponder_cost_sum += torch.mean(ponder_cost)
+            #print(ponder_cost_sum)
+            units.append((ponder_cost, used_unit))
             if self.return_features[stage_name]:
                 outputs.append(x)
-        losses = {'ponder_cost': ponder_cost.cuda()}
+        losses = {'ponder_cost': ponder_cost_sum * self.sact_weight}
 
         return outputs, losses, units
 
@@ -520,8 +580,6 @@ class Block(nn.Module):
         self.block_name = []
         self.eps = 1e-2
 
-        # important parameters.
-        self.ponder_weight = 0.005
 
         for i in range(block_count):
 
@@ -545,42 +603,38 @@ class Block(nn.Module):
             in_channels = out_channels
 
 
+
     def forward(self, x):
 
-
         for index, name in enumerate(self.block_name):
-
-            # halting_proba should be in the range (0,1)
             x, halting_proba = getattr(self, name)(x)
-            for i in range(len(halting_proba)):
-                minval = halting_proba[i].clone().min()
-                halting_proba[i] = halting_proba[i] - minval
-                mrange = halting_proba[i].clone().max() - minval
-                if mrange > 0:
-                    halting_proba[i] = halting_proba[i].clone()/mrange + halting_proba[i] - halting_proba[i]
-                else:
-                    halting_proba[i] = halting_proba[i] - halting_proba[i]
 
             # todo: check whether it stops at a spatial position i, j? if true, skip.
-            # should pass a mask to self.unit
+
+            # initialize the variables which depend on the input shape
             if not index:
+                # batch, 1 chanel, height, width
                 shape = [x.shape[0], 1, x.shape[2], x.shape[3]]
 
-                self.halting_cumsum = torch.zeros(shape)
-                self.element_finished = torch.zeros(shape)
-                self.remainder = torch.ones(shape)
-                self.ponder_cost = torch.ones(shape)
-                self.num_unit = torch.zeros(shape, dtype=torch.int32)
+                self.halting_cumsum = torch.zeros(shape).cuda()
+                self.element_finished = torch.zeros(shape).cuda()
+                self.remainder = torch.ones(shape).cuda()
+                self.ponder_cost = torch.ones(shape).cuda()
+                self.num_unit = torch.zeros(shape, dtype=torch.int32).cuda()
 
-            # always halting at the last unit
+            # always halt at the last unit
             if index == len(self.block_name) - 1:
-                halting_proba = torch.ones(shape)
+                halting_proba = torch.ones(shape).cuda()
             else:
-                halting_proba = halting_proba.cpu()
+                halting_proba = halting_proba
 
             self.halting_cumsum += halting_proba
+
+            # halt
             cur_elements_finished = (self.halting_cumsum >= 1 - self.eps)
-            #halting_proba = torch.where(cur_elements_finished, torch.zeros(x.shape), halting_proba)
+
+            # zero out halting proba for the previously finished positions
+            halting_proba = torch.where(cur_elements_finished, torch.zeros(shape).cuda(), halting_proba)
 
             # find positions which have halted at the current unit
             just_finished = cur_elements_finished & (self.element_finished == False)
@@ -595,22 +649,86 @@ class Block(nn.Module):
             # If it has been finished before the current step, we add 0.
             # If it is not done yet, we add 1 to to N.
             self.ponder_cost += torch.where(cur_elements_finished,
-                                                           torch.where(just_finished, self.remainder, torch.zeros(shape)),
-                                                           torch.ones(shape)) * self.ponder_weight
+                                                           torch.where(just_finished, self.remainder, torch.zeros(shape).cuda()),
+                                                           torch.ones(shape).cuda()) #* self.ponder_weight
 
-            self.num_unit += (self.element_finished == False).type(torch.int32) #need to consider shape!
+            self.num_unit += (self.element_finished == False).type(torch.int32)
 
             if index == 0:
-                output = x * cur_halting_dist.cuda()
+                output = x * cur_halting_dist
             else:
-                output = output + x * cur_halting_dist.cuda()
+                output = output + x * cur_halting_dist
 
             self.remainder -= halting_proba
 
             self.element_finished = cur_elements_finished
 
+        # return output, self.ponder_cost, self.num_unit
         return output, self.ponder_cost, self.num_unit
-        # return x, self.ponder_cost, self.num_unit
+
+    # def forward(self, x):
+    #
+    #     for index, name in enumerate(self.block_name):
+    #         x, halting_proba = getattr(self, name)(x)
+    #         # for i in range(len(halting_proba)):
+    #         #     minval = halting_proba[i].clone().min()
+    #         #     halting_proba[i] = halting_proba[i] - minval
+    #         #     mrange = halting_proba[i].clone().max() - minval
+    #         #     if mrange > 0:
+    #         #         halting_proba[i] = halting_proba[i].clone()/mrange + halting_proba[i] - halting_proba[i]
+    #         #     else:
+    #         #         halting_proba[i] = halting_proba[i] - halting_proba[i]
+    #
+    #         # todo: check whether it stops at a spatial position i, j? if true, skip.
+    #         # should pass a mask to self.unit
+    #         if not index:
+    #             shape = [x.shape[0], 1, x.shape[2], x.shape[3]]
+    #
+    #             self.halting_cumsum = torch.zeros(shape)
+    #             self.element_finished = torch.zeros(shape)
+    #             self.remainder = torch.ones(shape)
+    #             self.ponder_cost = torch.ones(shape)
+    #             self.num_unit = torch.zeros(shape, dtype=torch.int32)
+    #
+    #         # always halting at the last unit
+    #         if index == len(self.block_name) - 1:
+    #             halting_proba = torch.ones(shape)
+    #         else:
+    #             halting_proba = halting_proba.cpu()
+    #
+    #         self.halting_cumsum += halting_proba
+    #         cur_elements_finished = (self.halting_cumsum >= 1 - self.eps)
+    #         #halting_proba = torch.where(cur_elements_finished, torch.zeros(x.shape), halting_proba)
+    #
+    #         # find positions which have halted at the current unit
+    #         just_finished = cur_elements_finished & (self.element_finished == False)
+    #
+    #         # see paper equation 9
+    #         # for such positions, the halting distribution value is the remainder,
+    #         # for others not finished yet, it is the halting probability
+    #         cur_halting_dist = torch.where(just_finished, self.remainder, halting_proba)
+    #
+    #         # see equation 11 in the paper
+    #         # Since R (remainder) is a fixed value, we add it to ponder cost at the end.
+    #         # If it has been finished before the current step, we add 0.
+    #         # If it is not done yet, we add 1 to to N.
+    #         self.ponder_cost += torch.where(cur_elements_finished,
+    #                                                        torch.where(just_finished, self.remainder, torch.zeros(shape)),
+    #                                                        torch.ones(shape)) * self.ponder_weight
+    #
+    #         self.num_unit += (self.element_finished == False).type(torch.int32) #need to consider shape!
+    #
+    #         if index == 0:
+    #             output = x * cur_halting_dist.cuda()
+    #         else:
+    #             output = output + x * cur_halting_dist.cuda()
+    #
+    #         self.remainder -= halting_proba
+    #
+    #         self.element_finished = cur_elements_finished
+    #
+    #     # return output, self.ponder_cost, self.num_unit
+    #     return output, self.ponder_cost, self.num_unit
 
 class Bottleneck(nn.Module):
     def __init__(
@@ -700,10 +818,10 @@ class Bottleneck(nn.Module):
             out_channels, 1, kernel_size=3, padding=dilation, bias=False
         )
 
-        for l in [self.conv1, self.conv3 ]:
+        for l in [self.conv1, self.conv3, self.conv4]:
             nn.init.kaiming_uniform_(l.weight, a=1)
 
-        nn.init.kaiming_uniform_(self.conv4.weight, a=1)
+        #nn.init.kaiming_uniform_(self.conv4.weight, a=1)
 
         self.bn4 = norm_func(1)
 
@@ -727,8 +845,10 @@ class Bottleneck(nn.Module):
         out += identity
         out = F.relu_(out)
 
-        halting_cost = self.conv4(out)
-        halting_cost = self.bn4(halting_cost)
+        halting_cost = self.bn4(out)
+        halting_cost = self.conv4(halting_cost)
+        halting_cost = torch.sigmoid(halting_cost)
+
         return out, halting_cost
 
 

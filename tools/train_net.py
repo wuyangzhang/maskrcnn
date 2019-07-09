@@ -34,17 +34,17 @@ except ImportError:
 
 
 def train(cfg, local_rank, distributed):
-
-    #wz: load the model specified in cfg and upload it to cuda!
     model = build_detection_model(cfg)
+
+
     device = torch.device(cfg.MODEL.DEVICE)
     model.to(device)
 
-    #wz: check the details
+
     optimizer = make_optimizer(cfg, model)
     scheduler = make_lr_scheduler(cfg, optimizer)
 
-    # Initialize mixed-precision training wz: a trick to increase the training accuracy?
+    # Initialize mixed-precision training
     use_mixed_precision = cfg.DTYPE == "float16"
     amp_opt_level = 'O1' if use_mixed_precision else 'O0'
     model, optimizer = amp.initialize(model, optimizer, opt_level=amp_opt_level)
@@ -59,14 +59,12 @@ def train(cfg, local_rank, distributed):
     arguments = {}
     arguments["iteration"] = 0
 
-    # wz: model save
     output_dir = cfg.OUTPUT_DIR
 
     save_to_disk = get_rank() == 0
     checkpointer = DetectronCheckpointer(
         cfg, model, optimizer, scheduler, output_dir, save_to_disk
     )
-
     extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
     arguments.update(extra_checkpoint_data)
 
@@ -91,7 +89,6 @@ def train(cfg, local_rank, distributed):
     )
 
     return model
-
 
 def run_test(cfg, model, distributed):
     if distributed:
@@ -141,6 +138,7 @@ def main():
         help="Do not test the final model",
         action="store_true",
     )
+
     parser.add_argument(
         "opts",
         help="Modify config options using the command-line",
@@ -153,16 +151,12 @@ def main():
     num_gpus = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else 1
     args.distributed = num_gpus > 1
 
-    # wz: multi-GPU training?
     if args.distributed:
         torch.cuda.set_device(args.local_rank)
         torch.distributed.init_process_group(
             backend="nccl", init_method="env://"
         )
         synchronize()
-
-    if not args.config_file:
-        args.config_file = "./configs/e2e_mask_rcnn_R_50_FPN_1x.yaml"
 
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
