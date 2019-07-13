@@ -27,7 +27,7 @@ from sklearn.model_selection import train_test_split
 
 class RPPNDataset(Dataset):
 
-    def __init__(self, video_files, dataset, window=5, simulate=False, batch_size=100):
+    def __init__(self, video_files, dataset, window=5, simulate=False, batch_size=16):
         """Constructor
         :param video_files: the root folder of video files
         :param window: the size of sliding window

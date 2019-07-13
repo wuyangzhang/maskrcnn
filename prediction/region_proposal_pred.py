@@ -9,7 +9,6 @@ region proposals to the labels.?
 import time
 from torch import nn
 import torch.optim
-from torch.autograd import Variable
 from prediction import RPPNDataset
 
 from prediction.convlstm import ConvLSTM
@@ -49,6 +48,38 @@ save_freq = 1000
 h, w = 375, 1242
 
 
+for epoch in range(100):
+    for batch_id, data in enumerate(data_loader):
+
+        total_iter += 1
+        iter_start_time = time.time()
+        train_x, train_y = data
+        train_x = train_x.cuda()
+        train_y = train_y.cuda()
+
+
+        optimizer.zero_grad()
+
+        out = net(train_x)
+        out_bbox = out[:, :, :4]
+        label_bbox = train_y[:, :, :4]
+
+        loss_iou = iou_loss(out_bbox, label_bbox)
+
+        loss_iou.backward()
+        # loss_complexity.backward()
+        optimizer.step()
+        if total_iter % print_freq == 0:
+            print('Epoch: {}, Batch {}, IoU Loss:{:.5f}'.format(epoch, batch_id + 1, loss_iou.data))
+
+        if total_iter % save_freq == 0:
+            torch.save(net.state_dict(), 'rppn_checkpoint.pth')
+
+
+
+
+
+
 def resize(data: torch.Tensor):
 
     bbox, complexity = data[:, :, :4], data[:, :, 4]
@@ -60,46 +91,3 @@ def resize(data: torch.Tensor):
     bbox = bbox.int()
 
     return bbox, complexity
-
-
-for epoch in range(100):
-    for batch_id, data in enumerate(data_loader):
-
-        total_iter += 1
-        iter_start_time = time.time()
-        train_x, train_y = data
-        train_x = train_x.cuda()
-        train_y = train_y.cuda()
-        # var_x = Variable(train_x).cuda()
-        # var_y = Variable(train_y).cuda()
-
-        optimizer.zero_grad()
-
-        # out = net(var_x)
-        #
-        # # resize
-        # #out_bbox, out_complexity = resize(out)
-        # #label_bbox, label_complexity = resize(var_y)
-        #
-        # out_bbox = out[:, :, :4]
-        # label_bbox = var_y[:, :, :4]
-
-        out = net(train_x)
-        out_bbox = out[:, :, :4]
-        label_bbox = train_y[:, :, :4]
-
-
-        #start = time.time()
-        loss_iou = iou_loss(out_bbox, label_bbox)
-
-        #loss_iou = criterion(out_bbox, label_bbox)
-        #loss_iou = Variable(loss_iou, requires_grad=True)
-
-        loss_iou.backward()
-        # loss_complexity.backward()
-        optimizer.step()
-        if total_iter % print_freq == 0:
-            print('Epoch: {}, Batch {}, IoU Loss:{:.5f}'.format(epoch, batch_id + 1, loss_iou.data))
-
-        if total_iter % save_freq == 0:
-            torch.save(net.state_dict(), 'rppn_checkpoint.pth')

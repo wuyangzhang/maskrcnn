@@ -49,10 +49,14 @@ def iou_loss(bboxes_pred: torch.Tensor, bboxes_label: torch.Tensor):
 
         # clean invalid bbox
         # iou = torch.where(bboxes_pred[:, :, 2] < bboxes_pred[:, :, 0], iou, torch.tensor([0.]).cuda())
-        # iou = torch.where(bboxes_pred[:, :, 3] < bboxes_pred[:, :, 1], iou, torch.tensor([0.]).cuda())
+        # iou = torch.where(bboxes_pred[:, :, 3] < bboxes_pred[:, :, 1], iou, torch.tensor([0.]).cuda())]
+
+        # reset iou for those padding bbox
+        iou = torch.where( (bbox_label[:, :, 0] + bbox_label[:, :, 1] + bbox_label[:, :, 2] + bbox_label[:, :, 3]) == 0, torch.tensor([1.]).cuda(), iou)
         iou = torch.max(iou)
         iou_loss.append((1 - iou).mean())
 
-    return sum(iou_loss)
+    return sum(iou_loss) / 30
+    #return total_loss.mean()
     # return (1-iou).mean()
     # return (bboxes_pred - bbox_label).mean()
