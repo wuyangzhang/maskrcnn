@@ -1,6 +1,7 @@
 from maskrcnn_benchmark.modeling.prediction.frame_predict import WorkloadDistPrediction
 
-class PredictionManager():
+
+class PredictionManager:
 
     def __init__(self, cfg):
 

@@ -7,6 +7,8 @@ class LSTM(nn.Module):
 
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers)
         self.reg = nn.Linear(150, 30)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x, _ = self.rnn(x)
@@ -15,6 +17,8 @@ class LSTM(nn.Module):
         x = x.permute(0, 2, 1).contiguous()
         x = self.reg(x)
         x = x.permute(0, 2, 1).contiguous()
+        x = self.relu(x)
+        x = self.sigmoid(x)
         return x
 
 # net = LSTM(5, 5)

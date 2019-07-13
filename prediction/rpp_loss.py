@@ -1,33 +1,57 @@
 import torch
+import torch.nn.functional as F
 
 SMOOTH = 1e-6
 
+'''
+which bounding box will be the correct label for the prediction???
 
-def iou_loss(outputs: torch.Tensor, labels: torch.Tensor):
-    # You can comment out this line if you are passing tensors of equal shape
-    # But if you are passing output from UNet or something it will most probably
-    # be with the BATCH x 1 x H x W shape
-    #outputs = outputs.squeeze(1)  # BATCH x 1 x H x W => BATCH x H x W
-    # iterate each sample
-    # iterate each region proposal in the output if it is not all zero
-    # find the minimal IOU pair in the labels
+O(n2) to search all of them. 
 
-    loss = 0
-    for batch_index, batch in enumerate(outputs):
-        for rp_index, rp in enumerate(batch):
-            if sum(rp) == 0:
-                continue
-            max_iou = 0
-
-            for pair in labels[batch_index]:
+100, 1, 4 vs 100, 30, 4 => 100, 4 
+for loop
+'''
 
 
-    intersection = (outputs & labels).float().sum((1, 2))  # Will be zero if Truth=0 or Prediction=0
-    union = (outputs | labels).float().sum((1, 2))  # Will be zzero if both are 0
+def iou_loss(bboxes_pred: torch.Tensor, bboxes_label: torch.Tensor):
+    # bbox format, (x1, y1, x2, y2)
 
-    iou = (intersection + SMOOTH) / (union + SMOOTH)  # We smooth our devision to avoid 0/0
+    iou_loss = []
+    for bbox_id in range(bboxes_label.shape[1]):
+        bbox_label = bboxes_label[:, bbox_id, :]
+        bbox_label = bbox_label.reshape(bbox_label.shape[0], 1, bbox_label.shape[1])
+        bbox_label = bbox_label.repeat(1, 30, 1)
 
-    thresholded = torch.clamp(20 * (iou - 0.5), 0, 10).ceil() / 10  # This is equal to comparing with thresolds
+        x1 = torch.max(bboxes_pred[:, :, 0], bbox_label[:, :, 0])
+        y1 = torch.max(bboxes_pred[:, :, 1], bbox_label[:, :, 1])
+        x2 = torch.min(bboxes_pred[:, :, 2], bbox_label[:, :, 2])
+        y2 = torch.min(bboxes_pred[:, :, 3], bbox_label[:, :, 3])
 
-    return thresholded.mean()  # Or thresholded.mean() if you are interested in average across the batch
+        inter_area = (x2 - x1) * (y2 - y1)
 
+        # intersection area cannot be neg, clean invalid ones
+        inter_area = torch.where(x2 > x1, inter_area, torch.tensor([0]).int().cuda())
+        inter_area = torch.where(y2 > y1, inter_area, torch.tensor([0]).int().cuda())
+
+        bbox_pred_area = (bboxes_pred[:, :, 2] - bboxes_pred[:, :, 0]) * (
+                    bboxes_pred[:, :, 3] - bboxes_pred[:, :, 1])
+
+        # bbox area cannot be neg, clean invalid ones
+        bbox_pred_area = torch.where(bboxes_pred[:, :, 2] > bboxes_pred[:, :, 0], bbox_pred_area,
+                                     torch.tensor([0]).int().cuda())
+        bbox_pred_area = torch.where(bboxes_pred[:, :, 3] > bboxes_pred[:, :, 1], bbox_pred_area,
+                                     torch.tensor([0]).int().cuda())
+
+        bbox_label_area = (bbox_label[:, :, 2] - bbox_label[:, :, 0]) * (
+                    bbox_label[:, :, 3] - bbox_label[:, :, 1])
+        union = bbox_pred_area + bbox_label_area - inter_area
+
+        iou = inter_area.float() / (SMOOTH + union.float())
+
+        # clean invalid bbox
+        # iou = torch.where(bboxes_pred[:, :, 2] < bboxes_pred[:, :, 0], iou, torch.tensor([0.]).cuda())
+        # iou = torch.where(bboxes_pred[:, :, 3] < bboxes_pred[:, :, 1], iou, torch.tensor([0.]).cuda())
+        iou_loss.append((1 - iou).mean())
+
+    #return sum(iou_loss)
+    return (1-iou).mean()

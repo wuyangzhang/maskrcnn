@@ -25,7 +25,6 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 
 
-
 class RPPNDataset(Dataset):
 
     def __init__(self, video_files, dataset, window=5, simulate=False, batch_size=100):
@@ -102,7 +101,7 @@ class RPPNDataset(Dataset):
             input_tensors = torch.as_tensor(input_tensors).reshape(-1, 5)
 
             target_path = select_data + '/' + '0' * (6-len(str(start_video_index+1))) + str(start_video_index+1) + '.txt'
-            target_tensor = self.load_tensor(target_path, self.max_padding_len)
+            target_tensor = self.load_tensor(target_path, self.max_padding_len, padding=True)
             target_tensor = torch.as_tensor(target_tensor).reshape(-1, 5)
             #target_tensor = torch.flatten(target_tensor)
             #input_tensors = torch.nn.utils.rnn.pad_sequence(input_tensors, batch_first=True)
@@ -115,7 +114,7 @@ class RPPNDataset(Dataset):
         return DataLoader(self, batch_size=self.batch_size, shuffle=shuffle)
 
     @staticmethod
-    def load_tensor(filepath, max_padding_len):
+    def load_tensor(filepath, max_padding_len, padding=True):
         """
         load bbox's coordinates and computing complexity in a sing image.
         When the number of bbox is smaller than the max length, we pad
@@ -129,8 +128,9 @@ class RPPNDataset(Dataset):
                 vals = line.split(' ')
                 vals = [float(val) for val in vals]
                 res.append(vals)
-            for _ in range(max_padding_len - len(res)):
-                res.append([0.0]*5)
+            if padding:
+                for _ in range(max_padding_len - len(res)):
+                    res.append([0.0]*5)
             return res
 
 
