@@ -26,11 +26,12 @@ if model == 'lstm':
 elif model == 'convlstm':
     net = ConvLSTM(input_channels=150, hidden_channels=[128, 64, 64, 32, 32], kernel_size=3)
 
+net.train()
 net.cuda()
 
 '''optimizer & learning rate'''
 criterion = nn.MSELoss()
-optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
+optimizer = torch.optim.Adam(net.parameters(), lr=1e-5)
 
 '''data loader'''
 video_files = '/home/wuyang/kitty/testing/seq_list.txt'
@@ -67,21 +68,31 @@ for epoch in range(100):
         total_iter += 1
         iter_start_time = time.time()
         train_x, train_y = data
-
-        var_x = Variable(train_x).cuda()
-        var_y = Variable(train_y).cuda()
+        train_x = train_x.cuda()
+        train_y = train_y.cuda()
+        # var_x = Variable(train_x).cuda()
+        # var_y = Variable(train_y).cuda()
 
         optimizer.zero_grad()
 
-        out = net(var_x)
+        # out = net(var_x)
+        #
+        # # resize
+        # #out_bbox, out_complexity = resize(out)
+        # #label_bbox, label_complexity = resize(var_y)
+        #
+        # out_bbox = out[:, :, :4]
+        # label_bbox = var_y[:, :, :4]
 
-        # resize
-        out_bbox, out_complexity = resize(out)
-        label_bbox, label_complexity = resize(var_y)
+        out = net(train_x)
+        out_bbox = out[:, :, :4]
+        label_bbox = train_y[:, :, :4]
 
-        start = time.time()
-        #loss_iou = iou_loss(out_bbox, label_bbox)
-        loss_iou = nn.L1Loss(out_bbox, label_bbox)
+
+        #start = time.time()
+        loss_iou = iou_loss(out_bbox, label_bbox)
+
+        #loss_iou = criterion(out_bbox, label_bbox)
         #loss_iou = Variable(loss_iou, requires_grad=True)
 
         loss_iou.backward()
