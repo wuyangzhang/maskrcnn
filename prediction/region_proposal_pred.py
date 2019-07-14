@@ -49,7 +49,8 @@ training process
 '''
 total_iter = 0
 print_freq = 10
-save_freq = 1000
+eval_freq = 1
+save_freq = 1
 h, w = 375, 1242
 
 for epoch in range(100):
@@ -75,8 +76,25 @@ for epoch in range(100):
         if total_iter % print_freq == 0:
             print('Epoch: {}, Batch {}, IoU Loss:{:.5f}'.format(epoch, batch_id + 1, loss_iou.data))
 
-        if total_iter % save_freq == 0:
+        if epoch % save_freq == 0:
             torch.save(net.state_dict(), 'rppn_checkpoint.pth')
+
+    if epoch % eval_freq == 0:
+        # evaluate the model.
+        with torch.no_grad():
+            loss = []
+            for batch_id, data in enumerate(eval_data_loader):
+                train_x, train_y = data
+                train_x = train_x.cuda()
+                train_y = train_y.cuda()
+                out = net(train_x)
+                out_bbox = out[:, :, :4]
+                label_bbox = train_y[:, :, :4]
+                loss_iou = iou_loss(out_bbox, label_bbox)
+                loss.append(loss_iou)
+
+        print('loss over the test dataset {}'.format(sum(loss) / len(loss)))
+
 
 
 def resize(data: torch.Tensor):
