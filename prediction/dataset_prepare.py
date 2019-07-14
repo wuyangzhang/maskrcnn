@@ -40,7 +40,7 @@ class RPPNDataset(Dataset):
         self.batch_size = batch_size
         self.dataset = dataset
         self.cnt = 0
-        self.max_padding_len = 30
+        self.max_padding_len = 32
 
         if simulate:
             self.data = get_example_output(batch_size)

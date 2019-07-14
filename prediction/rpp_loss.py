@@ -10,7 +10,7 @@ def iou_loss(bboxes_pred: torch.Tensor, bboxes_label: torch.Tensor):
     for bbox_id in range(bboxes_label.shape[1]):
         bbox_label = bboxes_label[:, bbox_id, :]
         bbox_label = bbox_label.reshape(bbox_label.shape[0], 1, bbox_label.shape[1])
-        bbox_label = bbox_label.repeat(1, 30, 1)
+        bbox_label = bbox_label.repeat(1, 32, 1)
 
         x1 = torch.max(bboxes_pred[:, :, 0], bbox_label[:, :, 0])
         y1 = torch.max(bboxes_pred[:, :, 1], bbox_label[:, :, 1])

@@ -42,7 +42,6 @@ def cal_bbox(folderpath):
                     f.write(vals + '\n')
     print('finish bbox calculation')
 
-
 def process():
     f = open(output_dir, 'w')
     for video in os.listdir(root_dir):
@@ -57,5 +56,5 @@ def process():
     f.close()
 
 
-cal_bbox(root_dir)
-# process()
+# cal_bbox(root_dir)
+process()

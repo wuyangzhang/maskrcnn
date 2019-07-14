@@ -7,14 +7,15 @@ class LSTM(nn.Module):
         self.hidden_size = hidden_size
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
 
-        #self.reg = nn.Linear(150, 30)
+        # self.reg = nn.Linear(150, 30)
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
         # designed for #2 input shape : batch_size, seq_length (total frame number), 5 features * 30 bbox/frame. Designed for LSTM input
         self.reg = nn.Linear(5, 1)
 
-        self.reg2 = nn.Linear(self.hidden_size, 150)
+        self.reg2 = nn.Linear(self.hidden_size, 160)
+
     def forward(self, x):
         x, _ = self.rnn(x)
 
@@ -28,5 +29,5 @@ class LSTM(nn.Module):
 
         # designed for #2 input shape : batch_size, seq_length (total frame number), 5 features * 30 bbox/frame. Designed for LSTM input
         x = self.reg2(x)
-        x = x.reshape(x.shape[0], x.shape[2]//5, 5)
+        x = x.reshape(x.shape[0], x.shape[2] // 5, 5)
         return x
