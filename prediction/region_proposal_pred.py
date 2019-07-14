@@ -52,6 +52,8 @@ print_freq = 10
 eval_freq = 1
 save_freq = 1
 h, w = 375, 1242
+max_bbox_num = 32
+complexity_loss_weight = 0.1
 
 for epoch in range(100):
     for batch_id, data in enumerate(train_data_loader):
@@ -60,21 +62,21 @@ for epoch in range(100):
         iter_start_time = time.time()
         train_x, train_y = data
         train_x = train_x.cuda()
-        train_y = train_y.cuda()
+        labels = train_y.cuda()
 
         out = net(train_x)
         optimizer.zero_grad()
 
-        out_bbox = out[:, :, :4]
-        label_bbox = train_y[:, :, :4]
-
-        loss_iou = iou_loss(out_bbox, label_bbox)
-
-        loss_iou.backward()
+        loss_iou, loss_complexity = iou_loss(out, labels, max_bbox_num)
+        loss = loss_iou + loss_complexity * complexity_loss_weight
+        loss.backward()
+        # loss.backward()
         # loss_complexity.backward()
         optimizer.step()
         if total_iter % print_freq == 0:
-            print('Epoch: {}, Batch {}, IoU Loss:{:.5f}'.format(epoch, batch_id + 1, loss_iou.data))
+            print('Epoch: {}, batch {}, IoU loss:{:.5f}, computing complexity loss:{:.5f}'.format(epoch, batch_id + 1,
+                                                                                                  loss_iou.item(),
+                                                                                                  loss_complexity.item()))
 
         if epoch % save_freq == 0:
             torch.save(net.state_dict(), 'rppn_checkpoint.pth')
@@ -82,19 +84,18 @@ for epoch in range(100):
     if epoch % eval_freq == 0:
         # evaluate the model.
         with torch.no_grad():
-            loss = []
+            iou_losses, complexity_losses = [], []
             for batch_id, data in enumerate(eval_data_loader):
                 train_x, train_y = data
                 train_x = train_x.cuda()
                 train_y = train_y.cuda()
                 out = net(train_x)
-                out_bbox = out[:, :, :4]
-                label_bbox = train_y[:, :, :4]
-                loss_iou = iou_loss(out_bbox, label_bbox)
-                loss.append(loss_iou)
+                loss_iou, loss_complexity = iou_loss(out, train_y, max_bbox_num)
+                iou_losses.append(loss_iou)
+                complexity_losses.append(loss_complexity)
 
-        print('loss over the test dataset {}'.format(sum(loss) / len(loss)))
-
+        print('[Testing] IOU loss {}, computing complexity loss {} over the test dataset.'.
+              format(sum(iou_losses) / len(iou_losses), sum(complexity_losses) / len(complexity_losses)))
 
 
 def resize(data: torch.Tensor):
