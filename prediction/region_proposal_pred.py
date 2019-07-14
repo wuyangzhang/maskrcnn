@@ -22,7 +22,7 @@ model = models[0]
 
 # should convert the input shape to (batch_size, length(5), num of features(30*5))
 if model == 'lstm':
-    net = LSTM(input_size=5, hidden_size=5, num_layers=2)
+    net = LSTM(input_size=150, hidden_size=64, num_layers=4)
 elif model == 'convlstm':
     net = ConvLSTM(input_channels=30, hidden_channels=[128, 64, 64, 32, 32], kernel_size=3)
 
