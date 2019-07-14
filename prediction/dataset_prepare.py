@@ -27,7 +27,7 @@ from sklearn.model_selection import train_test_split
 
 class RPPNDataset(Dataset):
 
-    def __init__(self, video_files, dataset, window=5, simulate=False, batch_size=16):
+    def __init__(self, video_files, dataset, window=5, simulate=False, batch_size=64):
         """Constructor
         :param video_files: the root folder of video files
         :param window: the size of sliding window
@@ -47,7 +47,7 @@ class RPPNDataset(Dataset):
             return
 
         if dataset == 'kitti':
-            self.files = video_files # seq_list.txt
+            self.files = video_files  # seq_list.txt
             f = open(self.files, 'r')
             self.video_size = []
             self.video_dir = []
@@ -60,7 +60,7 @@ class RPPNDataset(Dataset):
             self.prefix = [self.video_size[0]] * len(self.video_size)
 
             for i in range(1, len(self.video_size)):
-                self.prefix[i] = self.video_size[i] + self.prefix[i-1]
+                self.prefix[i] = self.video_size[i] + self.prefix[i - 1]
 
             f.close()
         else:
@@ -74,7 +74,7 @@ class RPPNDataset(Dataset):
 
             l, r = 0, len(self.video_size)
             while l < r:
-                m = l + (r-l) // 2
+                m = l + (r - l) // 2
                 if self.prefix[m] < index:
                     l = m + 1
                 else:
@@ -84,34 +84,40 @@ class RPPNDataset(Dataset):
             if l < 1:
                 start_video_index = index
             else:
-                start_video_index = index - self.prefix[l-1]
+                start_video_index = index - self.prefix[l - 1]
 
             # corner case: cannot find sufficient preceding or next video frames
-            if start_video_index >= self.video_size[l]-1 or start_video_index < self.window:
-                start_video_index = random.randint(self.window, self.video_size[l]-2)
+            if start_video_index >= self.video_size[l] - 1 or start_video_index < self.window:
+                start_video_index = random.randint(self.window, self.video_size[l] - 2)
 
             # find preceding video frames with slide window
             indexes = [start_video_index - i for i in range(self.window)]
-            input_path = [select_data + '/' + '0'*(6-len(str(i))) + str(i) + '.txt' for i in indexes]
+            input_path = [select_data + '/' + '0' * (6 - len(str(i))) + str(i) + '.txt' for i in indexes]
             input_tensors = []
+
+            # format 1: input shape = batch_size, seq_length (total bbox number), 5 features
+            # for path in input_path:
+            #     input_tensors += self.load_tensor(path, self.max_padding_len)
+            # input_tensors = torch.as_tensor(input_tensors).reshape(-1, 5)
+
+            # format 2: input shape = batch_size, seq_length (total frame number), 5 features * 30 bbox/frame. Designed for LSTM input
             for path in input_path:
-                input_tensors += self.load_tensor(path, self.max_padding_len)
+                input_tensors.append(torch.tensor(self.load_tensor(path, self.max_padding_len)).reshape(-1))
+            input_tensors = torch.stack(input_tensors)
 
-            #todo: consider to reshape to the image shape, [20,5,5]..
-            input_tensors = torch.as_tensor(input_tensors).reshape(-1, 5)
-
-            target_path = select_data + '/' + '0' * (6-len(str(start_video_index+1))) + str(start_video_index+1) + '.txt'
+            target_path = select_data + '/' + '0' * (6 - len(str(start_video_index + 1))) + str(
+                start_video_index + 1) + '.txt'
             target_tensor = self.load_tensor(target_path, self.max_padding_len, padding=True)
             target_tensor = torch.as_tensor(target_tensor).reshape(-1, 5)
-            #target_tensor = torch.flatten(target_tensor)
-            #input_tensors = torch.nn.utils.rnn.pad_sequence(input_tensors, batch_first=True)
+            # target_tensor = torch.flatten(target_tensor)
+            # input_tensors = torch.nn.utils.rnn.pad_sequence(input_tensors, batch_first=True)
             return input_tensors, target_tensor
 
         else:
             raise NotImplementedError
 
-    def getDataLoader(self, shuffle=False):
-        return DataLoader(self, batch_size=self.batch_size, shuffle=shuffle)
+    def getDataLoader(self, batch_size, shuffle=False):
+        return DataLoader(self, batch_size=batch_size, shuffle=shuffle)
 
     @staticmethod
     def load_tensor(filepath, max_padding_len, padding=True):
@@ -130,7 +136,7 @@ class RPPNDataset(Dataset):
                 res.append(vals)
             if padding:
                 for _ in range(max_padding_len - len(res)):
-                    res.append([0.0]*5)
+                    res.append([0.0] * 5)
             return res
 
 
@@ -188,7 +194,7 @@ def slide_window(x, look_back, stride=1):
 # X, Y = slide_window(dataset, look_back)
 # X_train, Y_train, X_test, Y_test = make_dataset(X, Y)
 
-#cal_bbox('/home/wuyang/kitty/training/image_02')
+# cal_bbox('/home/wuyang/kitty/training/image_02')
 
 def test():
     video_files = '/home/wuyang/kitty/testing/seq_list.txt'

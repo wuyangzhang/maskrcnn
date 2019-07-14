@@ -8,7 +8,7 @@ from demo.mobile_client import MaskCompute
 root_dir = '/home/wuyang/kitty/training/image_02/'
 output_dir = '/home/wuyang/kitty/training/seq_list.txt'
 
-#from demo.mobile_client import MaskCompute
+# from demo.mobile_client import MaskCompute
 
 
 """
@@ -16,6 +16,8 @@ Calculate bbox and complexity of all images.
 Write results to files.
 Need to normalize bbox.. and complexity
 """
+
+
 def cal_bbox(folderpath):
     mask_compute = MaskCompute()
 
@@ -40,8 +42,8 @@ def cal_bbox(folderpath):
                     f.write(vals + '\n')
     print('finish bbox calculation')
 
-def process():
 
+def process():
     f = open(output_dir, 'w')
     for video in os.listdir(root_dir):
         video_dir = root_dir + video
@@ -50,8 +52,10 @@ def process():
             v = v.split('/')[-1]
             index.append(int(v.split('.')[0]))
         max_index, min_index = max(index), min(index)
-        f.write('{},{}\n'.format(video_dir, max_index+1))
+        f.write('{},{}\n'.format(video_dir, max_index + 1))
 
     f.close()
 
-process()
+
+cal_bbox(root_dir)
+# process()

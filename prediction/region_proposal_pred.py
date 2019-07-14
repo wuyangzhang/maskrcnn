@@ -20,22 +20,23 @@ models = ('lstm', 'convlstm')
 
 model = models[0]
 
+# should convert the input shape to (batch_size, length(5), num of features(30*5))
 if model == 'lstm':
-    net = LSTM(5, 5)
+    net = LSTM(input_size=5, hidden_size=5, num_layers=2)
 elif model == 'convlstm':
-    net = ConvLSTM(input_channels=150, hidden_channels=[128, 64, 64, 32, 32], kernel_size=3)
+    net = ConvLSTM(input_channels=30, hidden_channels=[128, 64, 64, 32, 32], kernel_size=3)
 
-net.train()
+# net.train()
 net.cuda()
 
 '''optimizer & learning rate'''
 criterion = nn.MSELoss()
-optimizer = torch.optim.Adam(net.parameters(), lr=1e-5)
+optimizer = torch.optim.Adam(net.parameters(), lr=1e-8)
 
 '''data loader'''
 video_files = '/home/wuyang/kitty/testing/seq_list.txt'
 dataset = 'kitti'
-data_loader = RPPNDataset(video_files, dataset).getDataLoader(shuffle=False)
+data_loader = RPPNDataset(video_files, dataset).getDataLoader(batch_size=32, shuffle=False)
 
 '''
 training process
@@ -57,10 +58,9 @@ for epoch in range(100):
         train_x = train_x.cuda()
         train_y = train_y.cuda()
 
-
+        out = net(train_x)
         optimizer.zero_grad()
 
-        out = net(train_x)
         out_bbox = out[:, :, :4]
         label_bbox = train_y[:, :, :4]
 

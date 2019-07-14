@@ -76,7 +76,7 @@ class ConvLSTM(nn.Module):
                 # all cells are initialized in the first step
                 name = 'cell{}'.format(i)
                 if step == 0:
-                    bsize, _, height, width = x.size()
+                    bsize, height, width = x.size()
                     (h, c) = getattr(self, name).init_hidden(batch_size=bsize, hidden=self.hidden_channels[i],
                                                              shape=(height, width))
                     internal_state.append((h, c))
