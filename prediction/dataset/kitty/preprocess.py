@@ -3,7 +3,7 @@ import glob
 
 import cv2
 
-from demo.mobile_client import MaskCompute
+from demo.maskrcnn import MaskCompute
 
 root_dir = '/home/wuyang/kitty/training/image_02/'
 output_dir = '/home/wuyang/kitty/training/seq_list.txt'
@@ -26,7 +26,8 @@ def cal_bbox(folderpath):
 
             bbox_file_path = img_path.split('.')[0] + '.txt'
             img = cv2.imread(img_path)
-            bbox, bbox_complexity = mask_compute.run(img)
+            _, bbox, bbox_complexity = mask_compute.run(img)
+            print(bbox)
             height, width = img.shape[:2]
             print('processing img {}'.format(img_path))
             with open(bbox_file_path, 'w+') as f:
@@ -56,5 +57,5 @@ def process():
     f.close()
 
 
-# cal_bbox(root_dir)
-process()
+cal_bbox(root_dir)
+# process()

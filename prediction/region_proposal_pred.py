@@ -15,6 +15,20 @@ from prediction.convlstm import ConvLSTM
 from prediction.lstm import LSTM
 from prediction.rpp_loss import iou_loss
 
+
+class PredictionDelegator:
+    def __init__(self, config):
+        self.config = config
+        if config.pred_algo == 0:
+            self.model = LSTM(input_size=160, hidden_size=64, num_layers=4)
+        elif config.pred_algo == 1:
+            self.model = ConvLSTM(input_channels=30, hidden_channels=[128, 64, 64, 32, 32], kernel_size=3)
+        self.model.cuda()
+        self.model.eval()
+
+    def run(self, input):
+        return self.model(input)
+
 '''model selection'''
 models = ('lstm', 'convlstm')
 
@@ -78,8 +92,8 @@ for epoch in range(100):
                                                                                                   loss_iou.item(),
                                                                                                   loss_complexity.item()))
 
-        if epoch % save_freq == 0:
-            torch.save(net.state_dict(), 'rppn_checkpoint.pth')
+        # if epoch % save_freq == 0:
+        #     torch.save(net.state_dict(), 'rppn_checkpoint.pth')
 
     if epoch % eval_freq == 0:
         # evaluate the model.

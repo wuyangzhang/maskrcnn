@@ -25,9 +25,8 @@ class LSTM(nn.Module):
         x = self.reg(x)
         x = x.permute(0, 2, 1).contiguous()
         x = self.relu(x)
-        x = self.sigmoid(x)
-
         # designed for #2 input shape : batch_size, seq_length (total frame number), 5 features * 30 bbox/frame. Designed for LSTM input
         x = self.reg2(x)
+        x = self.sigmoid(x)
         x = x.reshape(x.shape[0], x.shape[2] // 5, 5)
         return x

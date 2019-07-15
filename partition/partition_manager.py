@@ -3,25 +3,28 @@ import torch
 import cv2
 from maskrcnn_benchmark.utils import cv2_util
 
-class PartitionManager():
 
-    def __init__(self, parition_num=2):
-        assert parition_num % 2 == 0, 'Error: partition number must be the time of 2'
-        self.partition_num = parition_num
+class PartitionManager:
+    def __init__(self, config):
+        self.config = config
+        self.par_num = self.config.par_num
+        assert self.par_num % 2 == 0, 'Error: partition number must be the time of 2'
+
         self.server_par_map = None
         # x * y = N, min abs(x-y)
         self.height_partition = self.width_partition = 1
         target = float('inf')
-        for num in range(1, self.partition_num):
-            if self.partition_num % num == 0:
-                tmp = abs(self.partition_num / num - num)
+        for num in range(1, self.par_num):
+            if self.par_num % num == 0:
+                tmp = abs(self.par_num / num - num)
                 if tmp < target:
                     target = tmp
                     self.height_partition = num
-        self.width_partition = self.partition_num // self.height_partition
+        self.width_partition = self.par_num // self.height_partition
         self.partition_offset = list()
 
-    def find_intersection(self, a, b):  # returns None if rectangles don't intersect
+    @staticmethod
+    def find_intersection(a, b):  # returns None if rectangles don't intersect
         dx = min(a[2], b[2]) - max(a[0], b[0])
         dy = min(a[3], b[3]) - max(a[1], b[1])
         if (dx >= 0) and (dy >= 0):
@@ -30,27 +33,29 @@ class PartitionManager():
     ''' 
         Evaluate the processing capability based on the e2e latency 
     '''
-
-    def proc_capability_eval(self, proc_capability):
+    @staticmethod
+    def proc_capability_eval(proc_capability):
         max_latency = max(proc_capability)
         return [(1e-3 + max_latency) / latency for latency in proc_capability]
 
-    def bbox_area(self, bbox):
+    @staticmethod
+    def bbox_area(bbox):
         return (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
 
-    def frame_crop(self, frame, bbox):
+    @staticmethod
+    def frame_crop(frame, bbox):
         return frame[bbox[0]:bbox[2], bbox[1]:bbox[3]]
-
 
     '''mapping a partition to a specific node
         
         partition i belongs the node mapping[i]
     '''
+
     def partition_to_nodes(self, node_num):
         if self.server_par_map is None:
             order = [_ for _ in range(node_num)]
             random.shuffle(order)
-            self.server_par_map = {order[i] : i for i in range(node_num)}
+            self.server_par_map = {order[i]: i for i in range(node_num)}
             self.par_server_map = {i: order[i] for i in range(node_num)}
 
     """A frame partition scheme.  
@@ -81,6 +86,7 @@ class PartitionManager():
          N partitions  
 
     """
+
     def frame_partition(self, frame, bbox, complexity_weights, proc_capability):
 
         # each processing unit should randomly select a partition in the beginning.
@@ -101,7 +107,7 @@ class PartitionManager():
         for i in range(self.height_partition):
             for j in range(self.width_partition):
                 partition_coordinates.append([i * height_unit, j * width_unit,
-                                      (i + 1) * height_unit, (j + 1) * width_unit])
+                                              (i + 1) * height_unit, (j + 1) * width_unit])
 
         for box in bbox:
             box = box.to(torch.int64)
@@ -152,14 +158,15 @@ class PartitionManager():
 
         self.partition_offset = [(par[0], par[1]) for par in partition_coordinates]
 
-        return [self.frame_crop(frame, partition_coordinates[self.server_par_map[i]]) for i in range(len(proc_capability))]
-
+        return [self.frame_crop(frame, partition_coordinates[self.server_par_map[i]]) for i in
+                range(len(proc_capability))]
 
     '''Merge results from distribution
      
         Returns bbox with the offset compensation & merged mask
         assume the distributed_res stores the results in the server order  
     '''
+
     def merge_partition(self, distributed_res):
         res = None
         contours_list = list()
@@ -174,7 +181,6 @@ class PartitionManager():
                 distributed_res[server_id].bbox[id][1] = bbox[1] + x
                 distributed_res[server_id].bbox[id][2] = bbox[2] + y
                 distributed_res[server_id].bbox[id][3] = bbox[3] + x
-
 
             if res is None:
                 res = distributed_res[server_id]

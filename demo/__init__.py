@@ -1,1 +1,1 @@
-from .mobile_client import MaskCompute
+from .maskrcnn import MaskCompute

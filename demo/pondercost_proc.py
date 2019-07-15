@@ -2,7 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from matplotlib.figure import figaspect
+
 
 def ponder_cost_postproc(bbox, ponder_cost, img_shape):
     prev = ponder_cost[-1][0]
@@ -18,8 +18,8 @@ def ponder_cost_postproc(bbox, ponder_cost, img_shape):
         x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
         res = torch.mean(overlay_complexity.narrow(0, y1, y2 - y1).narrow(1, x1, x2 - x1))
         complexity.append(res.cpu())
-    return complexity
-
+    complexity = torch.stack(complexity)
+    return complexity.reshape(complexity.shape[0], 1)
 
 
 def vis_ponder_cost(ponder_cost, is_write=True):
@@ -46,6 +46,6 @@ def vis_ponder_cost(ponder_cost, is_write=True):
         fig.tight_layout()
         if is_write:
             i += 1
-            plt.savefig('ponder{}_{}.eps'.format(1, i), pad_inches = 0 , bbox_inches='tight')
+            plt.savefig('ponder{}_{}.eps'.format(1, i), pad_inches=0, bbox_inches='tight')
 
         plt.show()

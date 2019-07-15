@@ -10,6 +10,7 @@ from maskrcnn_benchmark.modeling.roi_heads.mask_head.inference import Masker
 from maskrcnn_benchmark import layers as L
 from maskrcnn_benchmark.utils import cv2_util
 
+
 class Resize(object):
     def __init__(self, min_size, max_size):
         self.min_size = min_size
@@ -133,12 +134,12 @@ class COCODemo(object):
     ]
 
     def __init__(
-        self,
-        cfg,
-        confidence_threshold=0.7,
-        show_mask_heatmaps=False,
-        masks_per_dim=2,
-        min_image_size=224,
+            self,
+            cfg,
+            confidence_threshold=0.7,
+            show_mask_heatmaps=False,
+            masks_per_dim=2,
+            min_image_size=224,
     ):
         self.cfg = cfg.clone()
         self.model = build_detection_model(cfg)
@@ -244,7 +245,6 @@ class COCODemo(object):
         result = self.overlay_class_names(result, predictions)
         return result
 
-
     def compute_prediction(self, original_image, resize=True):
         """
         Arguments:
@@ -257,7 +257,7 @@ class COCODemo(object):
         """
 
         # apply pre-processing to image
-        #todo: check the impact of resizing images
+        # todo: check the impact of resizing images
         if resize:
             image = self.transforms(original_image)
         else:
@@ -345,10 +345,10 @@ class COCODemo(object):
         Adds the instances contours for each predicted object.
         Each label has a different color.
 
-        Arguments:
-            image (np.ndarray): an image as returned by OpenCV
-            predictions (BoxList): the result of the computation by the model.
-                It should contain the field `mask` and `labels`.
+
+        :param image (np.ndarray): an image as returned by OpenCV
+        :param predictions (BoxList): the result of the computation by the model.
+        It should contain the field `mask` and `labels`.
         """
 
         if isContours:
@@ -447,9 +447,11 @@ class COCODemo(object):
 
         return image
 
+
 import numpy as np
 import matplotlib.pyplot as plt
 from maskrcnn_benchmark.structures.keypoint import PersonKeypoints
+
 
 def vis_keypoints(img, kps, kp_thresh=2, alpha=0.7):
     """Visualizes keypoints (adapted from vis_one_image).
@@ -468,14 +470,14 @@ def vis_keypoints(img, kps, kp_thresh=2, alpha=0.7):
 
     # Draw mid shoulder / mid hip first for better visualization.
     mid_shoulder = (
-        kps[:2, dataset_keypoints.index('right_shoulder')] +
-        kps[:2, dataset_keypoints.index('left_shoulder')]) / 2.0
+                           kps[:2, dataset_keypoints.index('right_shoulder')] +
+                           kps[:2, dataset_keypoints.index('left_shoulder')]) / 2.0
     sc_mid_shoulder = np.minimum(
         kps[2, dataset_keypoints.index('right_shoulder')],
         kps[2, dataset_keypoints.index('left_shoulder')])
     mid_hip = (
-        kps[:2, dataset_keypoints.index('right_hip')] +
-        kps[:2, dataset_keypoints.index('left_hip')]) / 2.0
+                      kps[:2, dataset_keypoints.index('right_hip')] +
+                      kps[:2, dataset_keypoints.index('left_hip')]) / 2.0
     sc_mid_hip = np.minimum(
         kps[2, dataset_keypoints.index('right_hip')],
         kps[2, dataset_keypoints.index('left_hip')])

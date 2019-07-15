@@ -1,59 +1,67 @@
-from maskrcnn_benchmark.modeling.prediction.frame_predict import WorkloadDistPrediction
+from prediction.pred_delegator import PredictionDelegator
 
 
 class PredictionManager:
+    def __init__(self, config):
 
-    def __init__(self, cfg):
+        self.config = config
 
-        self.max_queue_size = 5
+        self.bbox_queue = list()
+        self.max_queue_size = config.max_queue_size
+        self.pred_delegator = PredictionDelegator(config)
 
-        self.mask_queue = list()
-        self.predict_engine = WorkloadDistPrediction(cfg)
         self.next_predict = None
 
-    def add_mask(self, bbox, unit):
-        if len(self.mask_queue) == self.max_queue_size:
-            self.mask_queue.pop(0)
-        self.mask_queue.append((bbox.bbox, unit))
+    def add_bbox(self, bbox, overhead):
 
-        if len(self.mask_queue) == self.max_queue_size:
-            #self.next_predict = self.predict_workload_dist()
-            self.next_predict = self.test_predict()
+        # skip if no object has been found.
+        if len(overhead) == 0:
+            return
+
+        # only keep the last max_queue_size results.
+        if len(self.bbox_queue) == self.max_queue_size:
+            self.bbox_queue.pop(0)
+        self.bbox_queue.append((bbox.bbox, overhead))
+
+        # the historical results are enough for prediction
+        if len(self.bbox_queue) == self.max_queue_size:
+            self.next_predict = self.predict_bbox_dist()
+            # self.next_predict = self.test_predict()
 
     def get_queue_len(self):
-        return len(self.mask_queue)
+        return len(self.bbox_queue)
 
-    def get_last_mask(self):
-        return self.mask_queue[-1]
+    def is_active(self):
+        return len(self.bbox_queue) >= self.max_queue_size
 
     '''
     Predict computation cost in pixel level
     
     resize => avg => bbox area avg
     
-    Args:  
-        @units: recording the number of layers that the backbone network actually runs upon each ResNet block.   
+    :param units: recording the number of layers that the backbone network actually runs upon each ResNet block.   
 
-    Return:
+    :return:
         normalize the unit input apply that to each bbox
     '''
-    def predict_workload_dist(self, bbox, unit):
 
-        res = self.predict_engine.run(bbox, unit)
-        count = 0
-        for i in range(len(res)):
-            bbox[i] = res[i][:4]
-            unit[i] = res[i][-1]
-            count += 1
-        bbox = bbox[:count]
-        unit = unit[:count]
-        return bbox, unit
+    def predict_bbox_dist(self):
+        res = self.pred_delegator.run(self.bbox_queue)
+
 
     def test_predict(self):
-        return self.mask_queue[-1]
+        return self.bbox_queue[-1]
 
-    def next_predict_workload_dist(self):
-        return self.next_predict
+    '''
+    Get the prediction of the next workload distribution.
+     
+    :return bbox coordinates 
+    :return bbox weights 
+    '''
+    def get_pred_bbox(self):
+        #todo post process next predict
+        coords, weights = self.next_predict
+        return coords, weights
 
     '''
     A pixel level computation cost normalizer.

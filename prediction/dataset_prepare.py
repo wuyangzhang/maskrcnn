@@ -12,8 +12,6 @@ CityScape Datasets
 KTH Datasets
 Robotic Pushing Datasets
 '''
-import glob
-import os
 import random
 
 import numpy as np
@@ -100,7 +98,8 @@ class RPPNDataset(Dataset):
             #     input_tensors += self.load_tensor(path, self.max_padding_len)
             # input_tensors = torch.as_tensor(input_tensors).reshape(-1, 5)
 
-            # format 2: input shape = batch_size, seq_length (total frame number), 5 features * 30 bbox/frame. Designed for LSTM input
+            # format 2: input shape = batch_size, seq_length (total frame number), 5 features * 30 bbox/frame.
+            # Designed for LSTM input. e.g., [16, 5, 160]
             for path in input_path:
                 input_tensors.append(torch.tensor(self.load_tensor(path, self.max_padding_len)).reshape(-1))
             input_tensors = torch.stack(input_tensors)
