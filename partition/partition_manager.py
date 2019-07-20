@@ -1,11 +1,15 @@
 import random
+import collections
+
 import torch
-import cv2
-from maskrcnn_benchmark.utils import cv2_util
+import torch.nn
+
+from maskrcnn_benchmark.structures.bounding_box import BoxList
 
 
 class PartitionManager:
     def __init__(self, config):
+
         self.config = config
         self.par_num = self.config.par_num
         assert self.par_num % 2 == 0, 'Error: partition number must be the time of 2'
@@ -30,11 +34,11 @@ class PartitionManager:
         if (dx >= 0) and (dy >= 0):
             return dx * dy
 
-    ''' 
-        Evaluate the processing capability based on the e2e latency 
-    '''
     @staticmethod
     def proc_capability_eval(proc_capability):
+        '''
+            Evaluate the processing capability based on the e2e latency
+        '''
         max_latency = max(proc_capability)
         return [(1e-3 + max_latency) / latency for latency in proc_capability]
 
@@ -46,49 +50,42 @@ class PartitionManager:
     def frame_crop(frame, bbox):
         return frame[bbox[0]:bbox[2], bbox[1]:bbox[3]]
 
-    '''mapping a partition to a specific node
-        
-        partition i belongs the node mapping[i]
-    '''
-
     def partition_to_nodes(self, node_num):
+        '''mapping a partition to a specific node
+
+            partition i belongs the node mapping[i]
+        '''
         if self.server_par_map is None:
             order = [_ for _ in range(node_num)]
             random.shuffle(order)
             self.server_par_map = {order[i]: i for i in range(node_num)}
             self.par_server_map = {i: order[i] for i in range(node_num)}
 
-    """A frame partition scheme.  
-
-    This frame partition scheme performs based on the position of bounding boxes(bbox),  
-    the weights of bbox that indicate the potential computing complexity, and  
-    the avaiable computing resources that are represented by the historical  
-    computing time. Combining all of them toghter, we intend to partition a frame   
-    by following two rules: (1) to minimize the impact on the performance(accuray),   
-    (2) to balance the workload of multiple partitions.   
-
-    step 1. Equal partition.   
-
-    step 2. Computation complexity aware placement.  
-    for each bbox, check whether it is overlapped with multiple partitions.   
-    if not, add it to that partition and change the partition weight.   
-    if yes, select one of partitions based on its current weight. Each partition should 
-    have equal probability to be selected.  
-
-
-    Args:  
-         frame:      The frame we need to partition.  
-         bbox: The number of output channels for the convolution.  
-         weights: Spatial size of the convolution kernel.  
-         resources:       Additional position arguments forwarded to slim.conv2d.  
-
-      Returns:  
-         N partitions  
-
-    """
-
     def frame_partition(self, frame, bbox, complexity_weights, proc_capability):
+        """A frame partition scheme.
 
+        This frame partition scheme performs based on the position of bounding boxes(bbox),
+        the weights of bbox that indicate the potential computing complexity, and
+        the available computing resources that are represented by the historical
+        computing time. Combining all of them together, we intend to partition a frame
+        by following two rules: (1) to minimize the impact on the performance(accuray),
+        (2) to balance the workload of multiple partitions.
+
+        step 1. Equal partition.
+
+        step 2. Computation complexity aware placement.
+        for each bbox, check whether it is overlapped with multiple partitions.
+        if not, add it to that partition and change the partition weight.
+        if yes, select one of partitions based on its current weight. Each partition should
+        have equal probability to be selected.
+
+        :param frame:      The frame we need to partition.
+        :param bbox: The number of output channels for the convolution.
+        :param weights: Spatial size of the convolution kernel.
+        :param resources:       Additional position arguments forwarded to slim.conv2d.
+
+        :return N partitions
+        """
         # each processing unit should randomly select a partition in the beginning.
         self.partition_to_nodes(len(proc_capability))
         mapping = self.par_server_map
@@ -127,7 +124,7 @@ class PartitionManager:
 
                 overlap.append((i, intersect_size))
 
-                # decide which partition should handle this box and then change its size..
+            # decide which partition should handle this box and then change its size..
             # prefix sum of proc_capability
             if len(overlap) == 0:
                 continue
@@ -161,54 +158,95 @@ class PartitionManager:
         return [self.frame_crop(frame, partition_coordinates[self.server_par_map[i]]) for i in
                 range(len(proc_capability))]
 
-    '''Merge results from distribution
-     
-        Returns bbox with the offset compensation & merged mask
-        assume the distributed_res stores the results in the server order  
-    '''
-
     def merge_partition(self, distributed_res):
-        res = None
-        contours_list = list()
-        for server_id in range(len(distributed_res)):
+        '''Merge results from distribution
+
+            Returns bbox with the offset compensation & merged mask
+            assume the distributed_res stores the results in the server order
+        '''
+        bboxes = []
+        extras = collections.defaultdict(list)
+        for server_id in distributed_res:
+            bbox = distributed_res[server_id][0]
+            if len(bbox.bbox) == 0:
+                continue
+            # modify the bounding box positions by compensating the offsets
             par_id = self.server_par_map[server_id]
             x, y = self.partition_offset[par_id]
+            bbox.bbox = bbox.bbox.int()
+            bbox.add_offset(x, y)
 
-            # fix the bounding box positions by compensating the offsets
-            for id, bbox in enumerate(distributed_res[server_id].bbox):
-                bbox = bbox.to(torch.int64)
-                distributed_res[server_id].bbox[id][0] = bbox[0] + y
-                distributed_res[server_id].bbox[id][1] = bbox[1] + x
-                distributed_res[server_id].bbox[id][2] = bbox[2] + y
-                distributed_res[server_id].bbox[id][3] = bbox[3] + x
+            bboxes.append(bbox.bbox)
 
-            if res is None:
-                res = distributed_res[server_id]
-            else:
-                # merge bbox
-                res.bbox = torch.cat((res.bbox, distributed_res[server_id].bbox))
-                # merge labels
-                res.extra_fields["labels"] = torch.cat(
-                    (res.get_field("labels"), distributed_res[server_id].get_field("labels")))
-                # merge scores
-                res.extra_fields["scores"] = torch.cat(
-                    (res.get_field("scores"), distributed_res[server_id].get_field("scores")))
+            # mask fixing.. put 0 around mask
+            # find the offset for each mask in the order of (l, r, u, d)
+            pad = torch.nn.ConstantPad2d((y,
+                                          self.config.frame_width - y - bbox.extra_fields['mask'].shape[3],
+                                          x,
+                                          self.config.frame_height - x - bbox.extra_fields['mask'].shape[2]),
+                                         0)
 
-            # merge mask
-            if len(distributed_res[server_id].get_field('mask')) == 0:
-                continue
-            else:
-                masks = distributed_res[server_id].extra_fields['mask'].numpy()
-                for id, mask in enumerate(masks):
-                    thresh = mask[0, :, :, None]
-                    contours, hierarchy = cv2_util.findContours(
-                        thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-                    )
+            bbox.extra_fields['mask'] = pad(bbox.extra_fields['mask'][:, :, ])
 
-                    for i, coord in enumerate(contours[0]):
-                        contours[0][i][0][0] = coord[0][0] + y
-                        contours[0][i][0][1] = coord[0][1] + x
+            # add extra fields
+            for key in bbox.extra_fields.keys():
+                extras[key].append(bbox.extra_fields[key])
 
-                    contours_list.append(contours)
-        res.extra_fields['mask'] = (contours_list)
-        return res
+        bboxes = torch.cat(bboxes, dim=0).float()
+
+        # concatenate
+        for key in extras.keys():
+            extras[key] = torch.cat(extras[key], dim=0)
+
+        # labels = torch.cat(extras['labels'], dim=0)
+        # scores = torch.cat(extras['scores'], dim=0)
+        # mask = torch.cat(extras['mask'], dim=0)
+        # overheads = torch.cat(extras['overheads'], dim=0)
+
+        # nms
+        x1 = bboxes[:, 0]
+        y1 = bboxes[:, 1]
+        x2 = bboxes[:, 2]
+        y2 = bboxes[:, 3]
+
+        area = (x2 - x1 + 1) * (y2 - y1 + 1)
+        idxs = torch.argsort(y2)
+
+        pick = torch.zeros(idxs.shape).byte()
+        while len(idxs) > 0:
+            # grab the last index in the indexes list and add the
+            # index value to the list of picked indexes
+            last = len(idxs) - 1
+            i = idxs[last]
+            pick[i] = 1
+
+            # find the largest (x, y) coordinates for the start of
+            # the bounding box and the smallest (x, y) coordinates
+            # for the end of the bounding box
+            xx1 = torch.max(x1[i], x1[idxs[:]])
+            yy1 = torch.max(y1[i], y1[idxs[:]])
+            xx2 = torch.min(x2[i], x2[idxs[:]])
+            yy2 = torch.min(y2[i], y2[idxs[:]])
+
+            # compute the width and height of the bounding box
+            w = torch.max(xx2 - xx1 + 1, torch.tensor([0.]))
+            h = torch.max(yy2 - yy1 + 1, torch.tensor([0.]))
+
+            # compute the ratio of overlap
+            overlap = (w * h) / area[idxs[:]]
+
+            # delete all indexes from the index list that have
+            idxs = idxs[overlap < self.config.overlap_threshold]
+
+        # now 'pick' keeps the index of bbox that should remain
+        # so we only keep those bbox and also update their extra fields.
+
+        bbox = BoxList(bboxes[pick], extras['mask'].shape[2:][::-1])
+
+        for key in extras.keys():
+            bbox.extra_fields[key] = extras[key][pick]
+        # bbox.extra_fields['labels'] = labels[pick]
+        # bbox.extra_fields['scores'] = scores[pick]
+        # bbox.extra_fields['mask'] = mask[pick]
+        # bbox.extra_fields['overheads'] = overheads[pick]
+        return bbox

@@ -126,6 +126,12 @@ class BoxList(object):
 
         return bbox.convert(self.mode)
 
+    def add_offset(self, x, y):
+        self.bbox[:, 0] = self.bbox[:, 0] + y
+        self.bbox[:, 1] = self.bbox[:, 1] + x
+        self.bbox[:, 2] = self.bbox[:, 2] + y
+        self.bbox[:, 3] = self.bbox[:, 3] + x
+
     def transpose(self, method):
         """
         Transpose bounding box (flip or rotate in 90 degree steps)

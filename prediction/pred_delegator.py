@@ -15,26 +15,30 @@ class PredictionDelegator:
             self.model = ConvLSTM(input_channels=30, hidden_channels=[128, 64, 64, 32, 32], kernel_size=3)
         self.model.cuda()
 
-
     def run(self, input):
         input = self.prepare_input(input)
         input = input.cuda()
         output = self.model(input)
-        self.post_proc(output)
+        return self.post_proc(output)
+
+    def nms_filter(self, bbox):
+        return
 
     def prepare_input(self, queue):
         # queue , bboxes, complexity
         res = []
-        for bboxes, overhead in queue:
-            bboxes[:, 0] = bboxes[:, 0] / self.config.frame_height
-            bboxes[:, 1] = bboxes[:, 1] / self.config.frame_width
-            bboxes[:, 2] = bboxes[:, 2] / self.config.frame_height
-            bboxes[:, 3] = bboxes[:, 3] / self.config.frame_width
+        for bbox in queue:
+            overhead = bbox.extra_fields['overheads']
+            bbox = bbox.bbox
+            bbox[:, 0] = bbox[:, 0] / self.config.frame_height
+            bbox[:, 1] = bbox[:, 1] / self.config.frame_width
+            bbox[:, 2] = bbox[:, 2] / self.config.frame_height
+            bbox[:, 3] = bbox[:, 3] / self.config.frame_width
             overhead = overhead / self.config.max_complexity
-            bboxes = torch.cat([bboxes, overhead], dim=1)
-            pad = torch.nn.ConstantPad2d((0, 0, 0, self.config.padding-bboxes.shape[0]), 0.)
-            bboxes = pad(bboxes)
-            res.append(bboxes)
+            bbox = torch.cat([bbox, overhead], dim=1)
+            pad = torch.nn.ConstantPad2d((0, 0, 0, self.config.padding-bbox.shape[0]), 0.)
+            bbox = pad(bbox)
+            res.append(bbox)
         res = torch.stack(res)
         return res.view(1, self.config.max_queue_size, -1)
 
@@ -42,3 +46,11 @@ class PredictionDelegator:
         output = output.squeeze(0)
         bbox = output[:, :4]
         overhead = output[:, -1]
+
+        # clean padding bbox
+        index = 0
+        while index < bbox.shape[0]:
+            if bbox[index][0] == bbox[index][1] == bbox[index][2] == bbox[index][3]:
+                break
+            index += 1
+        return bbox[:index], overhead[:index]

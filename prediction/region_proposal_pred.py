@@ -5,7 +5,6 @@ Two problems: how does the network know the number of output?
 how to calculate the IOU which requires to correctly map predicted
 region proposals to the labels.?
 '''
-
 import time
 from torch import nn
 import torch.optim
@@ -28,6 +27,7 @@ class PredictionDelegator:
 
     def run(self, input):
         return self.model(input)
+
 
 '''model selection'''
 models = ('lstm', 'convlstm')
@@ -114,7 +114,6 @@ for epoch in range(100):
 
 def resize(data: torch.Tensor):
     bbox, complexity = data[:, :, :4], data[:, :, 4]
-
     bbox[:, :, 0] = bbox[:, :, 0] * h
     bbox[:, :, 1] = bbox[:, :, 1] * w
     bbox[:, :, 2] = bbox[:, :, 2] * h

@@ -3,7 +3,7 @@ import glob
 
 import cv2
 
-from demo.maskrcnn import MaskCompute
+from app.app_manager import ApplicationManager
 
 root_dir = '/home/wuyang/kitty/training/image_02/'
 output_dir = '/home/wuyang/kitty/training/seq_list.txt'
@@ -19,7 +19,7 @@ Need to normalize bbox.. and complexity
 
 
 def cal_bbox(folderpath):
-    mask_compute = MaskCompute()
+    mask_compute = ApplicationManager()
 
     for folder in os.listdir(folderpath):
         for img_path in glob.glob(folderpath + '/' + folder + '/*.png'):

@@ -1,14 +1,13 @@
 class Config:
     def __init__(self):
-
         # general
-        self.frame_height = 375
-        self.frame_width = 1242
+        self.frame_height = None
+        self.frame_width = None
         self.max_complexity = 50
+        self.use_local = True
 
         # dataset
         self.eval_dataset = 'kitti'
-
         self.kitti_video_path = '/home/wuyang/kitty/testing/seq_list.txt'
 
         # prediction manager
@@ -20,6 +19,13 @@ class Config:
 
         # partition manager
         self.par_num = 2
+        self.total_remote_servers = 2
+        self.servers = {0: ('127.0.0.1', 5050), 1: ('127.0.0.1', 5051)}
+
+        # self.servers = {1: ('127.0.0.1', 5050), 2: ('127.0.0.1', 5051),
+        #                 3: ('127.0.0.1', 5052), 4: ('127.0.0.1', 5052)}
+
+        self.overlap_threshold = 0.7
 
         # flow control manager
         self.refresh_interval = 10

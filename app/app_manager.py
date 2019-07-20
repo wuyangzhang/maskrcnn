@@ -1,10 +1,10 @@
 import argparse
 from maskrcnn_benchmark.config import cfg
 from demo.predictor import COCODemo
-from . import pondercost_proc
+from demo import pondercost_proc
 
 
-class MaskCompute:
+class ApplicationManager:
     def __init__(self):
         parser = argparse.ArgumentParser(description="PyTorch Object Detection Webcam Demo")
         parser.add_argument(
@@ -65,19 +65,25 @@ class MaskCompute:
     def get_cfg(self):
         return self.cfg
 
-    def run(self, img, resize=True):
+    def run(self, img, res=None, resize=True):
         '''
         Given each application with SACT, we require it to output 3 results,
         1) final application rendering results
         2) bbox coordinates
         3) bbox computing complexity
         '''
-        predictions, ponder_cost = self.coco_demo.compute_prediction(img, resize)
+        predictions, overhead = self.coco_demo.compute_prediction(img, resize)
         bbox = self.coco_demo.select_top_predictions(predictions)
-        print(bbox.bbox)
-        bbox_complexity = pondercost_proc.ponder_cost_postproc(bbox.bbox, ponder_cost, img.shape)
-        composite = self.coco_demo.overlay_mask(img, bbox)
-        return composite, bbox, bbox_complexity
+        bbox = pondercost_proc.add_overhead(bbox, overhead, img.shape)
+        # composite = self.coco_demo.overlay_mask(img, bbox)
+        composite = self.coco_demo.overlay_boxes(img, bbox)
+
+        if res is not None:
+            res.append(bbox)
+        return composite, bbox
 
     def mask_overlay(self, img, mask, dist=False):
         return self.coco_demo.overlay(img, mask, dist)
+
+    def rendering(self, img, bbox):
+        return self.coco_demo.overlay_boxes(img, bbox)

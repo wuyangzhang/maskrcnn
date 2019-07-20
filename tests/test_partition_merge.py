@@ -1,7 +1,7 @@
 import time
 import cv2
 from partition.partition_manager import PartitionManager
-from demo.mobile_client import MaskCompute
+from demo.mobile_client import ApplicationManager
 
 
 file = 'COCO_test2014_000000032245.jpg' #baseball player
@@ -10,7 +10,7 @@ file = 'COCO_test2014_000000032245.jpg' #baseball player
 src = img = cv2.imread('/home/wuyang/coco/test2014/'+file)
 img = cv2.imread('/home/wuyang/Downloads/testing/image_02/0014/000010.png')
 
-engine = MaskCompute()
+engine = ApplicationManager()
 
 bbox, bbox_complexity = engine.run(img)
 composite = engine.mask_overlay(img, bbox)
