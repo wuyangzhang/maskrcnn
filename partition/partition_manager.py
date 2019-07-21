@@ -250,5 +250,4 @@ class PartitionManager:
         # bbox.extra_fields['scores'] = scores[pick]
         # bbox.extra_fields['mask'] = mask[pick]
         # bbox.extra_fields['overheads'] = overheads[pick]
-        print('server processing', bbox.bbox)
         return bbox

@@ -67,7 +67,7 @@ def main():
                 # merge all the results
                 bbox = control_mgr.merge_partitions()
 
-                print('######we have {} box in total#######'.format(len(bbox.bbox)))
+                #print('######we have {} box in total#######'.format(len(bbox.bbox)))
                 # print(bbox.bbox)
                 composite = app_mgr.rendering(img, bbox)
 
