@@ -3,6 +3,7 @@ import pickle
 import struct
 import time
 import signal
+import datetime
 
 
 class RemoteConnector:
@@ -23,14 +24,22 @@ class RemoteConnector:
     def get_avg_latency(self):
         return sum(self.e2e_latency) / len(self.e2e_latency)
 
-    def send(self, data, response):
+    def send(self, data, response, service_id):
 
         # send requests
+        s1 = time.time()
         data = pickle.dumps(data)
+        s2 = time.time()
+        #print('data dumps in {}'.format(s2-s1))
         data = struct.pack("L", len(data)) + data
-        print('send data to remote servers')
-        self.socket_TCP.sendall(data)
+        s1 = time.time()
+        #print('data pack in {}'.format(s1-s2))
 
+        print('[client] send data {} in {}'.format(service_id, datetime.datetime.now()))
+
+        self.socket_TCP.sendall(data)
+        s2 = time.time()
+        #print('send data in {}'.format(s2-s1))
 
         start = time.time()
         data = b''
@@ -42,8 +51,13 @@ class RemoteConnector:
         while len(data) < msg_size:
             data += self.socket_TCP.recv(self.buffer_size)
         res = data[:msg_size]
+
+        s1 = time.time()
         bbox = pickle.loads(res)
-        print('receive data in {} seconds'.format(time.time() - start))
+        print('[client] receive data {} in {}'.format(service_id, datetime.datetime.now()))
+
+        #print('load pickle in {}'.format(time.time()-s1))
+        #print('receive data in {} seconds'.format(time.time() - start))
         response.append(bbox)
 
         # data = []
@@ -55,10 +69,12 @@ class RemoteConnector:
         # while len(data) < msg_size:
         #     data.append(self.socket_TCP.recv(self.buffer_size))
         # res = data[:msg_size]
-        # mask, unit = pickle.loads(res)
+        # s1 = time.time()
+        # bbox = pickle.loads(res)
+        # print('load pickle in {}'.format(time.time()-s1))
         # print('receive data in {}'.format(time.time() - start))
-        # response.append(mask)
-        # response.append(unit)
+        # response.append(bbox)
+
 
     def disconnect(self):
         self.socket_TCP.shutdown(socket.SHUT_RDWR)

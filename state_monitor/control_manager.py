@@ -1,7 +1,7 @@
 import collections
 import threading
 
-from state_monitor.remote_server import RemoteConnector
+from state_monitor.remote_connector import RemoteConnector
 
 
 class ControlManager:
@@ -24,6 +24,7 @@ class ControlManager:
         self.sockets = dict()
         self.init_remote_servers()
 
+        self.service_id = 0
         # self.use_local = config.use_local
         # self.local_composite = None
 
@@ -52,16 +53,17 @@ class ControlManager:
             return self.branch_states[1]
 
     def dist_jobs(self, partitions):
+        self.service_id += 1
         threads = [None] * self.total_remote_servers
         #self.distributed_res = [[]] * self.total_remote_servers
         self.distributed_res = collections.defaultdict(list)
 
-        print('distribute the workloads to the servers..')
+        #print('distribute the workloads to the servers..')
         for i, sid in enumerate(self.sockets.keys()):
             #self.time_counter[i].append(time.time())
 
             threads[i] = threading.Thread(target=self.sockets[sid].send,
-                                          args=(partitions[i], self.distributed_res[sid]))
+                                          args=(partitions[i], self.distributed_res[sid], self.service_id))
 
             threads[i].start()
             #self.time_counter[i] = time.time() - self.time_counter[i][-1]
@@ -70,7 +72,7 @@ class ControlManager:
         for id, thread in enumerate(threads):
             thread.join()
 
-        print('All distributed results are ready.')
+        #print('All distributed results are ready.')
         # if self.use_local:
         #     local_partition = partitions[0]
         #     #self.local_composite, bbox, units = self.mask_engine.run(local_partition)

@@ -1,6 +1,7 @@
 import socket
 import pickle
 import struct
+import datetime
 
 from app.app_manager import ApplicationManager
 
@@ -37,13 +38,19 @@ class Server:
 
                 im = pickle.loads(frame_data)
                 # im = ujson(frame_data)
-                print('receive frame data in the shape {}'.format(im.shape))
-                _, bbox = self.app_engine.run(im)
-
-                print('ready to send out distributed results')
+                #print('receive frame data in the shape {}'.format(im.shape))
+                print('[server] receive data at ', datetime.datetime.now())
+                t1 = datetime.datetime.now()
+                bbox = self.app_engine.run(im)
+                print('[server slow compute in ', datetime.datetime.now()-t1)
+                #print('ready to send out distributed results')
+                print('[server] finish comp at ', datetime.datetime.now())
                 data = pickle.dumps(bbox)
+                print('[server] dumps at ', datetime.datetime.now())
                 # data = ujson.dumps([mask,unit])
                 data = struct.pack("L", len(data)) + data
+                print('[server] packs at ', datetime.datetime.now())
+                print('[server] send data at ', datetime.datetime.now())
                 connection.sendall(data)
 
                 #print('server processing', bbox.bbox)

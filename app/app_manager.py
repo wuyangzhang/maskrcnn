@@ -76,11 +76,11 @@ class ApplicationManager:
         bbox = self.coco_demo.select_top_predictions(predictions)
         bbox = pondercost_proc.add_overhead(bbox, overhead, img.shape)
         # composite = self.coco_demo.overlay_mask(img, bbox)
-        composite = self.coco_demo.overlay_boxes(img, bbox)
+        # composite = self.coco_demo.overlay_boxes(img, bbox)
 
         if res is not None:
             res.append(bbox)
-        return composite, bbox
+        return bbox
 
     def mask_overlay(self, img, mask, dist=False):
         return self.coco_demo.overlay(img, mask, dist)

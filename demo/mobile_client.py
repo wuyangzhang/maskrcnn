@@ -50,6 +50,7 @@ def main():
 
         if img is not None:
             branch = control_mgr.get_branch_state()
+            #branch = 'cache_refresh'
             if branch == 'distribute':
 
                 coords, weights = pred_mgr.get_pred_bbox()
@@ -68,21 +69,21 @@ def main():
                 bbox = control_mgr.merge_partitions()
 
                 #print('######we have {} box in total#######'.format(len(bbox.bbox)))
-                # print(bbox.bbox)
                 composite = app_mgr.rendering(img, bbox)
 
                 pred_mgr.add_bbox(bbox)
 
             elif branch == 'cache_refresh':
-                composite, bbox = app_mgr.run(img)
+                bbox = app_mgr.run(img)
 
                 pred_mgr.add_bbox(bbox)
+
 
             elif control_mgr.branch_states[branch] == 'shortcut':
                 composite = None
 
-            cv2.imshow("COCO detections", composite)
-            cv2.waitKey(100)
+            #cv2.imshow("COCO detections", composite)
+            #cv2.waitKey(100)
         else:
             cv2.imshow("COCO detections", control_mgr.last_composite)
 
@@ -94,6 +95,6 @@ def main():
             break  # esc to quit
     cv2.destroyAllWindows()
 
-
+# 0.12
 if __name__ == "__main__":
     main()
