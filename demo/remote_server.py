@@ -8,7 +8,7 @@ from app.app_manager import ApplicationManager
 class Server:
 
     def __init__(self, server_address, buffer_size=1024 * 1024):
-        self.mask_engine = ApplicationManager()
+        self.app_engine = ApplicationManager()
         self.buffer_size = buffer_size
         self.server_addr = server_address
         self.socket_TCP = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -38,7 +38,7 @@ class Server:
                 im = pickle.loads(frame_data)
                 # im = ujson(frame_data)
                 print('receive frame data in the shape {}'.format(im.shape))
-                _, bbox = self.mask_engine.run(im)
+                _, bbox = self.app_engine.run(im)
 
                 print('ready to send out distributed results')
                 data = pickle.dumps(bbox)
@@ -46,6 +46,7 @@ class Server:
                 data = struct.pack("L", len(data)) + data
                 connection.sendall(data)
 
+                #print('server processing', bbox.bbox)
                 # data = []
                 # while len(data) < self.payload_size:
                 #     data.append(connection.recv(self.buffer_size))

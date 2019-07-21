@@ -67,11 +67,11 @@ def main():
                 # merge all the results
                 bbox = control_mgr.merge_partitions()
 
-                pred_mgr.add_bbox(bbox)
-
                 print('######we have {} box in total#######'.format(len(bbox.bbox)))
-
+                # print(bbox.bbox)
                 composite = app_mgr.rendering(img, bbox)
+
+                pred_mgr.add_bbox(bbox)
 
             elif branch == 'cache_refresh':
                 composite, bbox = app_mgr.run(img)

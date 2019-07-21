@@ -31,7 +31,8 @@ def add_overhead(bbox, overhead, img_shape):
         res = torch.mean(overlay_complexity.narrow(0, y1, y2 - y1).narrow(1, x1, x2 - x1))
         bbox_overheads.append(res)
     bbox.bbox = bbox.bbox.float()
-    bbox.extra_fields['overheads'] = torch.stack(bbox_overheads).cpu().view(-1, 1)
+    if len(bbox.bbox) > 0:
+        bbox.extra_fields['overheads'] = torch.stack(bbox_overheads).cpu().view(-1, 1)
     return bbox
 
 
