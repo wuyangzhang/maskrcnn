@@ -76,6 +76,7 @@ def train(cfg, local_rank, distributed):
     )
 
     checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
+    checkpoint_period = 1000
 
     do_train(
         model,
@@ -126,7 +127,7 @@ def main():
     parser = argparse.ArgumentParser(description="PyTorch Object Detection Training")
     parser.add_argument(
         "--config-file",
-        default="",
+        default="./configs/caffe2/e2e_mask_rcnn_R_50_FPN_1x_caffe2.yaml",
         metavar="FILE",
         help="path to config file",
         type=str,

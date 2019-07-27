@@ -13,6 +13,7 @@ from prediction import RPPNDataset
 from prediction.convlstm import ConvLSTM
 from prediction.lstm import LSTM
 from prediction.rpp_loss import iou_loss
+from prediction.nms import nms
 
 
 class PredictionDelegator:
@@ -36,7 +37,7 @@ model = models[0]
 
 # should convert the input shape to (batch_size, length(5), num of features(30*5))
 if model == 'lstm':
-    net = LSTM(input_size=160, hidden_size=64, num_layers=4)
+    net = LSTM(input_size=160, hidden_size=64, num_layers=1)
 elif model == 'convlstm':
     net = ConvLSTM(input_channels=30, hidden_channels=[128, 64, 64, 32, 32], kernel_size=3)
 
@@ -74,12 +75,14 @@ for epoch in range(100):
 
         total_iter += 1
         iter_start_time = time.time()
-        train_x, train_y = data
+        train_x, train_y, _ = data
         train_x = train_x.cuda()
         labels = train_y.cuda()
 
         out = net(train_x)
         optimizer.zero_grad()
+
+        out = nms(out)
 
         loss_iou, loss_complexity = iou_loss(out, labels, max_bbox_num)
         loss = loss_iou + loss_complexity * complexity_loss_weight
@@ -88,22 +91,23 @@ for epoch in range(100):
         # loss_complexity.backward()
         optimizer.step()
         if total_iter % print_freq == 0:
-            print('Epoch: {}, batch {}, IoU loss:{:.5f}, computing complexity loss:{:.5f}'.format(epoch, batch_id + 1,
+            print('Epoch: {}, batch {}, IoU loss:{:.5f}, computing complexity loss:{:.5f}'.format(epoch+1, batch_id + 1,
                                                                                                   loss_iou.item(),
                                                                                                   loss_complexity.item()))
 
-        # if epoch % save_freq == 0:
-        #     torch.save(net.state_dict(), 'rppn_checkpoint.pth')
+        if epoch % save_freq == 0:
+            torch.save(net.state_dict(), 'rppn_checkpoint.pth')
 
     if epoch % eval_freq == 0:
         # evaluate the model.
         with torch.no_grad():
             iou_losses, complexity_losses = [], []
             for batch_id, data in enumerate(eval_data_loader):
-                train_x, train_y = data
+                train_x, train_y, _ = data
                 train_x = train_x.cuda()
                 train_y = train_y.cuda()
                 out = net(train_x)
+                out = nms(out)
                 loss_iou, loss_complexity = iou_loss(out, train_y, max_bbox_num)
                 iou_losses.append(loss_iou)
                 complexity_losses.append(loss_complexity)
@@ -120,3 +124,4 @@ def resize(data: torch.Tensor):
     bbox[:, :, 3] = bbox[:, :, 3] * w
     bbox = bbox.int()
     return bbox, complexity
+

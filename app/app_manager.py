@@ -1,7 +1,7 @@
 import argparse
 from maskrcnn_benchmark.config import cfg
 from demo.predictor import COCODemo
-from demo import pondercost_proc
+from tools.sact_helper import pondercost_proc
 
 
 class ApplicationManager:

@@ -25,13 +25,13 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
     current_keys = sorted(list(model_state_dict.keys()))
     loaded_keys = sorted(list(loaded_state_dict.keys()))
 
-    logger = logging.getLogger(__name__)
+    # logger = logging.getLogger(__name__)
     valid_cnt = 0
     if len(current_keys) == len(loaded_keys):
         for curr_key in current_keys:
             valid_cnt += 1
             model_state_dict[curr_key] = loaded_state_dict[curr_key]
-            logger.info(
+            print(
                 'load {} to {}'.format(curr_key, curr_key)
             )
 
@@ -50,7 +50,7 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
                 if mapper in loaded_keys:
                     valid_cnt += 1
                     model_state_dict[origin] = loaded_state_dict[mapper]
-                    logger.info(
+                    print(
                         'load {} to {}'.format(curr_key, mapper)
                     )
                 continue
@@ -58,7 +58,7 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
             if curr_key in loaded_keys:
                 valid_cnt += 1
                 model_state_dict[origin] = loaded_state_dict[curr_key]
-                logger.info(
+                print(
                     'load {} to {}'.format(curr_key, curr_key)
                 )
                 continue
@@ -68,7 +68,7 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
             if mapper in loaded_keys:
                 valid_cnt += 1
                 model_state_dict[origin] = loaded_state_dict[mapper]
-                logger.info(
+                print(
                     'load {} to {}'.format(curr_key, mapper)
                 )
                 continue
@@ -78,7 +78,7 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
             if mapper in loaded_keys:
                 valid_cnt += 1
                 model_state_dict[origin] = loaded_state_dict[mapper]
-                logger.info(
+                print(
                     'load {} to {}'.format(curr_key, mapper)
                 )
                 continue
@@ -94,7 +94,7 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
                 if mapper in loaded_keys:
                     valid_cnt += 1
                     model_state_dict[curr_key] = loaded_state_dict[mapper]
-                    logger.info(
+                    print(
                                     'load {} to {}'.format(curr_key, mapper)
                                 )
                 continue
@@ -102,7 +102,7 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
             if curr_key in loaded_keys:
                 valid_cnt += 1
                 model_state_dict[curr_key] = loaded_state_dict[curr_key]
-                logger.info(
+                print(
                     'load {} to {}'.format(curr_key, curr_key)
                 )
                 continue
@@ -112,7 +112,7 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
             if mapper in loaded_keys:
                 valid_cnt += 1
                 model_state_dict[curr_key] = loaded_state_dict[mapper]
-                logger.info(
+                print(
                     'load {} to {}'.format(curr_key, mapper)
                 )
                 continue
@@ -122,12 +122,12 @@ def align_and_update_state_dicts(model_state_dict, loaded_state_dict):
             if mapper in loaded_keys:
                 valid_cnt += 1
                 model_state_dict[curr_key] = loaded_state_dict[mapper]
-                logger.info(
+                print(
                     'load {} to {}'.format(curr_key, mapper)
                 )
                 continue
 
-    logger.info('totally load {} parameters'.format(valid_cnt))
+    print('totally load {} parameters'.format(valid_cnt))
 
     # wz modify:
     # logger = logging.getLogger(__name__)

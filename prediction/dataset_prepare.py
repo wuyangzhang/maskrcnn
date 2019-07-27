@@ -90,7 +90,7 @@ class RPPNDataset(Dataset):
 
             # find preceding video frames with slide window
             indexes = [start_video_index - i for i in range(self.window)]
-            input_path = [select_data + '/' + '0' * (6 - len(str(i))) + str(i) + '.txt' for i in indexes]
+            input_path = [select_data + '/' + '0' * (6 - len(str(i))) + str(i) + '.txt' for i in indexes][::-1]
             input_tensors = []
 
             # format 1: input shape = batch_size, seq_length (total bbox number), 5 features
@@ -110,7 +110,7 @@ class RPPNDataset(Dataset):
             target_tensor = torch.as_tensor(target_tensor).reshape(-1, 5)
             # target_tensor = torch.flatten(target_tensor)
             # input_tensors = torch.nn.utils.rnn.pad_sequence(input_tensors, batch_first=True)
-            return input_tensors, target_tensor
+            return input_tensors, target_tensor, input_path + [target_path]
 
         else:
             raise NotImplementedError

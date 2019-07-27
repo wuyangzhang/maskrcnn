@@ -16,6 +16,7 @@ def iou_loss(bboxes_pred: torch.Tensor, bboxes_label: torch.Tensor, max_bbox_num
     complexity_losses = []
 
     for bbox_id in range(bboxes_label.shape[1]):
+
         bbox_label = bboxes_label[:, bbox_id, :4]
         complexity_label = bboxes_label[:, bbox_id, -1]
 

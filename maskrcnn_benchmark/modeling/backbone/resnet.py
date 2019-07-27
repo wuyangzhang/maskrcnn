@@ -263,7 +263,7 @@ from maskrcnn_benchmark.layers import Conv2d
 from maskrcnn_benchmark.layers import DFConv2d
 from maskrcnn_benchmark.modeling.make_layers import group_norm
 from maskrcnn_benchmark.utils.registry import Registry
-
+from log import mylogger
 
 # ResNet stage specification
 StageSpec = namedtuple(
@@ -369,6 +369,8 @@ ResNet152FPNStagesTo5 = tuple(
         the ACT module, intermediate states weighted by the halting distribution
         tensor.
 """
+
+
 class ResNet(nn.Module):
     def __init__(self, cfg):
         super(ResNet, self).__init__()
@@ -381,7 +383,7 @@ class ResNet(nn.Module):
         stem_module = _STEM_MODULES[cfg.MODEL.RESNETS.STEM_FUNC]
         stage_specs = _STAGE_SPECS[cfg.MODEL.BACKBONE.CONV_BODY]
         transformation_module = _TRANSFORMATION_MODULES[cfg.MODEL.RESNETS.TRANS_FUNC]
-        self.sact_weight = 0.01
+        self.sact_weight = 0.03
         # Construct the stem module
         self.stem = stem_module(cfg)
 
@@ -398,7 +400,7 @@ class ResNet(nn.Module):
             stage2_relative_factor = 2 ** (stage_spec.index - 1)
             bottleneck_channels = stage2_bottleneck_channels * stage2_relative_factor
             out_channels = stage2_out_channels * stage2_relative_factor
-            stage_with_dcn = cfg.MODEL.RESNETS.STAGE_WITH_DCN[stage_spec.index -1]
+            stage_with_dcn = cfg.MODEL.RESNETS.STAGE_WITH_DCN[stage_spec.index - 1]
 
             # module = _make_stage(
             #     transformation_module,
@@ -453,20 +455,22 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         outputs = []
+        mylogger.info('resnet start')
         x = self.stem(x)
         ponder_cost_sum = 0
         units = []
         for stage_name in self.stages:
+            mylogger.info('resnet stage {}'.format(stage_name))
             # if stage_name == 'layer1':
             #     block = getattr(self, 'layer1')
             #     print(block.block1.conv4.weight)
-            x, ponder_cost, used_unit= getattr(self, stage_name)(x)
+            x, ponder_cost, used_unit = getattr(self, stage_name)(x)
             # total = 1
             # for i in range(len(ponder_cost.shape)):
             #     total *= ponder_cost.shape[i]
             # ponder_cost_sum += torch.sum(ponder_cost) / total
             ponder_cost_sum += torch.mean(ponder_cost)
-            #print(ponder_cost_sum)
+            # print(ponder_cost_sum)
             units.append((ponder_cost, used_unit))
             if self.return_features[stage_name]:
                 outputs.append(x)
@@ -477,16 +481,16 @@ class ResNet(nn.Module):
 
 class ResNetHead(nn.Module):
     def __init__(
-        self,
-        block_module,
-        stages,
-        num_groups=1,
-        width_per_group=64,
-        stride_in_1x1=True,
-        stride_init=None,
-        res2_out_channels=256,
-        dilation=1,
-        dcn_config={}
+            self,
+            block_module,
+            stages,
+            num_groups=1,
+            width_per_group=64,
+            stride_in_1x1=True,
+            stride_init=None,
+            res2_out_channels=256,
+            dilation=1,
+            dcn_config={}
     ):
         super(ResNetHead, self).__init__()
 
@@ -504,7 +508,6 @@ class ResNetHead(nn.Module):
             name = "layer" + str(stage.index)
             if not stride:
                 stride = int(stage.index > 1) + 1
-
 
             module = _make_stage(
                 block_module,
@@ -531,16 +534,16 @@ class ResNetHead(nn.Module):
 
 
 def _make_stage(
-    transformation_module,
-    in_channels,
-    bottleneck_channels,
-    out_channels,
-    block_count,
-    num_groups,
-    stride_in_1x1,
-    first_stride,
-    dilation=1,
-    dcn_config={}
+        transformation_module,
+        in_channels,
+        bottleneck_channels,
+        out_channels,
+        block_count,
+        num_groups,
+        stride_in_1x1,
+        first_stride,
+        dilation=1,
+        dcn_config={}
 ):
     blocks = []
     stride = first_stride
@@ -561,6 +564,7 @@ def _make_stage(
         in_channels = out_channels
     return nn.Sequential(*blocks)
 
+
 class Block(nn.Module):
 
     def __init__(self, transformation_module,
@@ -580,20 +584,18 @@ class Block(nn.Module):
         self.block_name = []
         self.eps = 1e-2
 
-
         for i in range(block_count):
-
-            name = "block" + str(i+1)
+            name = "block" + str(i + 1)
 
             module = transformation_module(
-                    in_channels,
-                    bottleneck_channels,
-                    out_channels,
-                    num_groups,
-                    stride_in_1x1,
-                    stride,
-                    dilation=dilatition,
-                    dcn_config=dcn_config
+                in_channels,
+                bottleneck_channels,
+                out_channels,
+                num_groups,
+                stride_in_1x1,
+                stride,
+                dilation=dilatition,
+                dcn_config=dcn_config
             )
 
             self.add_module(name, module)
@@ -601,8 +603,6 @@ class Block(nn.Module):
 
             stride = 1
             in_channels = out_channels
-
-
 
     def forward(self, x):
 
@@ -649,8 +649,8 @@ class Block(nn.Module):
             # If it has been finished before the current step, we add 0.
             # If it is not done yet, we add 1 to to N.
             self.ponder_cost += torch.where(cur_elements_finished,
-                                                           torch.where(just_finished, self.remainder, torch.zeros(shape).cuda()),
-                                                           torch.ones(shape).cuda()) #* self.ponder_weight
+                                            torch.where(just_finished, self.remainder, torch.zeros(shape).cuda()),
+                                            torch.ones(shape).cuda())  # * self.ponder_weight
 
             self.num_unit += (self.element_finished == False).type(torch.int32)
 
@@ -730,23 +730,23 @@ class Block(nn.Module):
     #     # return output, self.ponder_cost, self.num_unit
     #     return output, self.ponder_cost, self.num_unit
 
+
 class Bottleneck(nn.Module):
     def __init__(
-        self,
-        in_channels,
-        bottleneck_channels,
-        out_channels,
-        num_groups,
-        stride_in_1x1,
-        stride,
-        dilation,
-        norm_func,
-        dcn_config
+            self,
+            in_channels,
+            bottleneck_channels,
+            out_channels,
+            num_groups,
+            stride_in_1x1,
+            stride,
+            dilation,
+            norm_func,
+            dcn_config
     ):
         super(Bottleneck, self).__init__()
 
         self.downsample = None
-
 
         if in_channels != out_channels:
             down_stride = stride if dilation == 1 else 1
@@ -757,13 +757,13 @@ class Bottleneck(nn.Module):
                 ),
                 norm_func(out_channels),
             )
-            for modules in [self.downsample,]:
+            for modules in [self.downsample, ]:
                 for l in modules.modules():
                     if isinstance(l, Conv2d):
                         nn.init.kaiming_uniform_(l.weight, a=1)
 
         if dilation > 1:
-            stride = 1 # reset to be 1
+            stride = 1  # reset to be 1
 
         # The original MSRA ResNet models have stride in the first 1x1 conv
         # The subsequent fb.torch.resnet and Caffe2 ResNe[X]t implementations have
@@ -821,7 +821,7 @@ class Bottleneck(nn.Module):
         for l in [self.conv1, self.conv3, self.conv4]:
             nn.init.kaiming_uniform_(l.weight, a=1)
 
-        #nn.init.kaiming_uniform_(self.conv4.weight, a=1)
+        # nn.init.kaiming_uniform_(self.conv4.weight, a=1)
 
         self.bn4 = norm_func(1)
 
@@ -863,7 +863,7 @@ class BaseStem(nn.Module):
         )
         self.bn1 = norm_func(out_channels)
 
-        for l in [self.conv1,]:
+        for l in [self.conv1, ]:
             nn.init.kaiming_uniform_(l.weight, a=1)
 
     def forward(self, x):
@@ -876,15 +876,15 @@ class BaseStem(nn.Module):
 
 class BottleneckWithFixedBatchNorm(Bottleneck):
     def __init__(
-        self,
-        in_channels,
-        bottleneck_channels,
-        out_channels,
-        num_groups=1,
-        stride_in_1x1=True,
-        stride=1,
-        dilation=1,
-        dcn_config={}
+            self,
+            in_channels,
+            bottleneck_channels,
+            out_channels,
+            num_groups=1,
+            stride_in_1x1=True,
+            stride=1,
+            dilation=1,
+            dcn_config={}
     ):
         super(BottleneckWithFixedBatchNorm, self).__init__(
             in_channels=in_channels,
@@ -908,15 +908,15 @@ class StemWithFixedBatchNorm(BaseStem):
 
 class BottleneckWithGN(Bottleneck):
     def __init__(
-        self,
-        in_channels,
-        bottleneck_channels,
-        out_channels,
-        num_groups=1,
-        stride_in_1x1=True,
-        stride=1,
-        dilation=1,
-        dcn_config={}
+            self,
+            in_channels,
+            bottleneck_channels,
+            out_channels,
+            num_groups=1,
+            stride_in_1x1=True,
+            stride=1,
+            dilation=1,
+            dcn_config={}
     ):
         super(BottleneckWithGN, self).__init__(
             in_channels=in_channels,

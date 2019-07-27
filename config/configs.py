@@ -8,6 +8,7 @@ class Config:
 
         # dataset
         self.eval_dataset = 'kitti'
+        # kitti, h: 375, w: 1242
         self.kitti_video_path = '/home/wuyang/kitty/testing/seq_list.txt'
 
         # prediction manager
