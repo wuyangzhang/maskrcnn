@@ -37,7 +37,7 @@ model = models[0]
 
 # should convert the input shape to (batch_size, length(5), num of features(30*5))
 if model == 'lstm':
-    net = LSTM(input_size=160, hidden_size=64, num_layers=1)
+    net = LSTM(input_size=160, hidden_size=64, num_layers=2)
 elif model == 'convlstm':
     net = ConvLSTM(input_channels=30, hidden_channels=[128, 64, 64, 32, 32], kernel_size=3)
 
@@ -46,16 +46,17 @@ net.cuda()
 
 '''optimizer & learning rate'''
 criterion = nn.MSELoss()
-optimizer = torch.optim.Adam(net.parameters(), lr=1e-6)
+optimizer = torch.optim.Adadelta(net.parameters(), lr=1e-3)
 
 '''data loader'''
 train_video_files = '/home/wuyang/kitty/training/seq_list.txt'
 dataset = 'kitti'
-train_data_loader = RPPNDataset(train_video_files, dataset).getDataLoader(batch_size=16, shuffle=True)
-
+train_data = RPPNDataset(train_video_files, dataset)
+train_data_loader = train_data.getDataLoader(batch_size=32, shuffle=False)
+shape = train_data.shape
 test_video_files = '/home/wuyang/kitty/testing/seq_list.txt'
 
-eval_data_loader = RPPNDataset(test_video_files, dataset).getDataLoader(batch_size=16, shuffle=True)
+eval_data_loader = RPPNDataset(test_video_files, dataset).getDataLoader(batch_size=32, shuffle=False)
 
 '''
 training process
@@ -70,22 +71,36 @@ h, w = 375, 1242
 max_bbox_num = 32
 complexity_loss_weight = 0.1
 
-for epoch in range(100):
+for epoch in range(100000):
     for batch_id, data in enumerate(train_data_loader):
 
         total_iter += 1
         iter_start_time = time.time()
         train_x, train_y, _ = data
+        #print(batch_id, train_x.shape)
+
         train_x = train_x.cuda()
         labels = train_y.cuda()
 
+        s1 = time.time()
         out = net(train_x)
+
+        s2 = time.time()
+        print(s2-s1)
+
         optimizer.zero_grad()
 
-        out = nms(out)
+        s1 = time.time()
+        out = nms(out, shape)
+        s2 = time.time()
+        print('nms time', s2-s1)
 
+        s1 = time.time()
         loss_iou, loss_complexity = iou_loss(out, labels, max_bbox_num)
-        loss = loss_iou + loss_complexity * complexity_loss_weight
+        s2 = time.time()
+        print('iou time', s2-s1)
+        loss = loss_iou
+        #loss = loss_iou + loss_complexity * complexity_loss_weight
         loss.backward()
         # loss.backward()
         # loss_complexity.backward()
@@ -107,7 +122,7 @@ for epoch in range(100):
                 train_x = train_x.cuda()
                 train_y = train_y.cuda()
                 out = net(train_x)
-                out = nms(out)
+                out = nms(out, shape)
                 loss_iou, loss_complexity = iou_loss(out, train_y, max_bbox_num)
                 iou_losses.append(loss_iou)
                 complexity_losses.append(loss_complexity)

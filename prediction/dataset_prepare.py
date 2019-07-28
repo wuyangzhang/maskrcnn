@@ -39,6 +39,7 @@ class RPPNDataset(Dataset):
         self.dataset = dataset
         self.cnt = 0
         self.max_padding_len = 32
+        self.shape = None
 
         if simulate:
             self.data = get_example_output(batch_size)
@@ -61,6 +62,7 @@ class RPPNDataset(Dataset):
                 self.prefix[i] = self.video_size[i] + self.prefix[i - 1]
 
             f.close()
+            self.shape = (375, 1242)  # h, w
         else:
             raise NotImplementedError
 
@@ -133,6 +135,8 @@ class RPPNDataset(Dataset):
                 vals = line.split(' ')
                 vals = [float(val) for val in vals]
                 res.append(vals)
+            # shuffle bbox sequence
+            random.shuffle(res)
             if padding:
                 for _ in range(max_padding_len - len(res)):
                     res.append([0.0] * 5)

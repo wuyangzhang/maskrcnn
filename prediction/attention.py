@@ -16,7 +16,7 @@ from prediction.nms import nms
 
 
 look_back = 5
-batch_size = 16
+batch_size = 64
 
 
 class EncoderRNN(nn.Module):
@@ -58,13 +58,13 @@ class AttnDecoderRNN(nn.Module):
 
         # calculate attention
         attn = self.attn(input)
-        attn = attn.view(batch_size, -1)
+        attn = attn.view(attn.shape[0], -1)
         attn_weights = F.softmax(attn, dim=1)
-        attn_weights = attn_weights.view(batch_size, look_back, 1, -1)
+        attn_weights = attn_weights.view(attn.shape[0], look_back, 1, -1)
 
         attn_weights = attn_weights.repeat(1, 1, 5, 1)
         attn_weights = attn_weights.transpose(2, 3)
-        attn_weights = attn_weights.reshape(batch_size, look_back, -1)
+        attn_weights = attn_weights.reshape(attn.shape[0], look_back, -1)
 
         # apply attention
         attn_applied = torch.mul(input, attn_weights)
@@ -111,21 +111,21 @@ def train_iter(input_tensor: torch.tensor, target_tensor: torch.tensor,
 encoder = EncoderRNN(160, 160).cuda()
 decoder = AttnDecoderRNN(160, 160).cuda()
 
-encoder_optimizer = optim.SGD(encoder.parameters(), lr=1e-3)
-decoder_optimizer = optim.SGD(decoder.parameters(), lr=1e-3)
+encoder_optimizer = optim.Adadelta(encoder.parameters(), lr=1e-4)
+decoder_optimizer = optim.Adadelta(decoder.parameters(), lr=1e-4)
 
 
 train_video_files = '/home/wuyang/kitty/training/seq_list.txt'
 dataset = 'kitti'
-train_data_loader = RPPNDataset(train_video_files, dataset).getDataLoader(batch_size=batch_size, shuffle=True)
-
+train_data = RPPNDataset(train_video_files, dataset)
+train_data_loader = train_data.getDataLoader(batch_size=batch_size, shuffle=True)
+shape = train_data.shape
 test_video_files = '/home/wuyang/kitty/testing/seq_list.txt'
 
 eval_data_loader = RPPNDataset(test_video_files, dataset).getDataLoader(batch_size=batch_size, shuffle=True)
 
 
 def train():
-    encoder_hidden = encoder.initHidden()
     total_iter = 0
     max_bbox_num = 32
     complexity_loss_weight = 0.1
@@ -133,10 +133,12 @@ def train():
     for epoch in range(100):
         for batch_id, data in enumerate(train_data_loader):
             # break
+            encoder_hidden = encoder.initHidden()
+
             encoder_optimizer.zero_grad()
             decoder_optimizer.zero_grad()
 
-            train_x, train_y = data
+            train_x, train_y, _ = data
             train_x = train_x.cuda()
             labels = train_y.cuda()
 
@@ -156,10 +158,11 @@ def train():
             # the decoder
             decoder_output, _, decoder_attention = decoder(encoder_outputs, encoder_hidden)
 
-            decoder_output = nms(decoder_output)
+            decoder_output = nms(decoder_output, shape)
 
             loss_iou, loss_complexity = iou_loss(decoder_output, labels, max_bbox_num)
-            loss = loss_iou + loss_complexity * complexity_loss_weight
+            loss = loss_iou
+            #loss = loss_iou + loss_complexity * complexity_loss_weight
             loss.backward(retain_graph=True)
 
             encoder_optimizer.step()
@@ -167,16 +170,21 @@ def train():
 
             if batch_id % 10 == 0:
                 print(
-                    'Epoch: {}, batch {}, IoU loss:{:.5f}, computing complexity loss:{:.5f}'.format(epoch+1, batch_id + 1,
+                    'Epoch: {}, batch {}, IoU loss:{:.5f}, cc loss:{:.5f}'.format(epoch+1, batch_id + 1,
                                                                                                     loss_iou.item(),
-                                                                                                    loss_complexity.item()))
+                                                                                                             loss_complexity.item()))
+
+        if epoch % 1 == 0:
+            torch.save(encoder.state_dict(), 'en_rppn_checkpoint.pth')
+            torch.save(decoder.state_dict(), 'de_rppn_checkpoint.pth')
+
         with torch.no_grad():
             iou_losses, complexity_losses = [], []
             for batch_id, data in enumerate(eval_data_loader):
                 if batch_id > 692:
                     break
-                train_x, train_y = data
-                print(batch_id, train_x.shape)
+                train_x, train_y, _ = data
+                #print(batch_id, train_x.shape)
                 train_x = train_x.cuda()
                 train_y = train_y.cuda()
                 encoder_outputs = list()
@@ -197,7 +205,7 @@ def train():
                 decoder_output, _, decoder_attention = decoder(encoder_outputs, encoder_hidden)
 
                 # apply nms
-                #decoder_output = nms(decoder_output)
+                decoder_output = nms(decoder_output, shape)
 
                 loss_iou, loss_complexity = iou_loss(decoder_output, train_y, max_bbox_num)
                 iou_losses.append(loss_iou)
@@ -206,4 +214,6 @@ def train():
         print('[Testing] IOU loss {}, computing complexity loss {} over the test dataset.'.
               format(sum(iou_losses) / len(iou_losses), sum(complexity_losses) / len(complexity_losses)))
 
-train()
+
+if __name__ == "__main__":
+    train()
