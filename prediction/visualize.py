@@ -9,9 +9,9 @@ from prediction.nms import nms
 from prediction.attention import EncoderRNN, AttnDecoderRNN
 
 config = Config()
-alg = 2
+alg = 1
 if alg == 1:
-    model = LSTM(input_size=160, hidden_size=64, window=config.window_size, num_layers=2).cuda()
+    model = LSTM(input_size=160, hidden_size=64, window=config.window_size, num_layers=4).cuda()
     model.load_state_dict(torch.load(config.model_path))
 elif alg == 2:
     encoder = EncoderRNN(160, 160).cuda()
@@ -27,7 +27,7 @@ def visualize():
     test_video_files = config.home_addr + 'kitty/testing/seq_list.txt'
     dataset = 'kitti'
     eval_data = RPPNDataset(test_video_files, dataset)
-    eval_data_loader = eval_data.getDataLoader(batch_size=1, window_size=config.window_size, shuffle=False)
+    eval_data_loader = eval_data.getDataLoader(batch_size=1, window_size=config.window_size, shuffle=True)
     shape = eval_data.shape
 
     for batch_id, data in enumerate(eval_data_loader):
@@ -42,7 +42,10 @@ def visualize():
 
         # historical bbox
         train_x = torch.squeeze(train_x)
-        train_x = train_x.reshape(train_x.shape[0], -1, 5)[:, :, :4]
+        if len(train_x.shape) == 1:
+            train_x = train_x.reshape(1, -1, 5)[:, :, :4]
+        else:
+            train_x = train_x.reshape(train_x.shape[0], -1, 5)[:, :, :4]
         train_x[:, :, 0] *= imgs[0].shape[1]
         train_x[:, :, 1] *= imgs[0].shape[0]
         train_x[:, :, 2] *= imgs[0].shape[1]

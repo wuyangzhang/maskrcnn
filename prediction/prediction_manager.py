@@ -6,7 +6,7 @@ class PredictionManager:
 
         self.config = config
         self.bbox_queue = list()
-        self.max_queue_size = config.max_queue_size
+        self.max_queue_size = config.window_size
         self.pred_delegator = PredictionDelegator(config)
 
         self.next_predict = None

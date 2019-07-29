@@ -17,7 +17,7 @@ class Config:
         self.model_path = self.home_addr + 'maskrcnn-benchmark/prediction/rppn_checkpoint.pth'
         self.pred_algos = ('lstm', 'convlstm')
         self.pred_algo = 0
-        self.window_size = 5
+        self.window_size = 2
         self.padding = 32
 
         # partition manager

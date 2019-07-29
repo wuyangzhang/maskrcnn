@@ -8,7 +8,7 @@ class PredictionDelegator:
     def __init__(self, config):
         self.config = config
         if config.pred_algo == 0:
-            self.model = LSTM(input_size=160, hidden_size=64, num_layers=4)
+            self.model = LSTM(input_size=160, hidden_size=64, window=config.window_size, num_layers=4)
             self.model.load_state_dict(torch.load(self.config.model_path))
             self.model.eval()
         elif config.pred_algo == 1:

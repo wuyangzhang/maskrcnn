@@ -12,21 +12,31 @@ class LSTM(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
         # designed for #2 input shape : batch_size, seq_length (total frame number), 5 features * 30 bbox/frame. Designed for LSTM input
-        self.reg = nn.Linear(window, 1)
+        self.reg = nn.Linear(window * hidden_size, hidden_size)
 
-        self.reg2 = nn.Linear(self.hidden_size, 160)
+        self.score_lin = nn.Linear(5, 1)
+        self.score_sigmoid = nn.Sigmoid()
+        #self.reg2 = nn.Linear(self.hidden_size, 160)
 
     def forward(self, x):
         x, _ = self.rnn(x)
 
         # designed for #1 input shape : batch_size, seq_length (total bbox number), 5 features
 
-        x = x.permute(0, 2, 1).contiguous()
+        #x = x.permute(0, 2, 1).contiguous()
+        #x = self.reg(x)
+        #x = x.permute(0, 2, 1).contiguous()
+
+        x = x.reshape(x.shape[0], -1)
         x = self.reg(x)
-        x = x.permute(0, 2, 1).contiguous()
         x = self.relu(x)
+        x = x.reshape(x.shape[0], -1, 5)
+        score = self.score_lin(x)
+        score = score.reshape(score.shape[0], -1)
+        score = self.score_sigmoid(score)
         # designed for #2 input shape : batch_size, seq_length (total frame number), 5 features * 30 bbox/frame. Designed for LSTM input
-        x = self.reg2(x)
+        #x = self.reg2(x)
         x = self.sigmoid(x)
-        x = x.reshape(x.shape[0], x.shape[2] // 5, 5)
-        return x
+
+        #x = x.reshape(x.shape[0], -1, 5)
+        return x, score
