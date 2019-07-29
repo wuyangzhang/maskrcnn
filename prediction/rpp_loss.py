@@ -1,8 +1,5 @@
 import torch
 
-#SMOOTH = 1e-6
-
-SMOOTH = torch.tensor([1e-6]).cuda()
 '''
 this loss function handles both bbox prediction 
 and computing complexity loss
@@ -20,6 +17,8 @@ def iou_loss(bboxes_pred: torch.Tensor, bboxes_label: torch.Tensor, max_bbox_num
     :param max_bbox_num:
     :return:
     '''
+    SMOOTH = torch.tensor([1e-6]).cuda()
+
     iou_losses = []
     complexity_losses = []
 
@@ -35,8 +34,8 @@ def iou_loss(bboxes_pred: torch.Tensor, bboxes_label: torch.Tensor, max_bbox_num
         bbox_label = bbox_label.reshape(bbox_label.shape[0], 1, bbox_label.shape[1])
         bbox_label = bbox_label.repeat(1, max_bbox_num, 1)
 
-        #complexity_label = complexity_label.reshape(complexity_label.shape[0], 1, 1)
-        #complexity_label = complexity_label.repeat(1, max_bbox_num, 1)
+        # complexity_label = complexity_label.reshape(complexity_label.shape[0], 1, 1)
+        # complexity_label = complexity_label.repeat(1, max_bbox_num, 1)
 
         x1 = torch.max(bboxes_pred[:, :, 0], bbox_label[:, :, 0])
         y1 = torch.max(bboxes_pred[:, :, 1], bbox_label[:, :, 1])
@@ -68,16 +67,18 @@ def iou_loss(bboxes_pred: torch.Tensor, bboxes_label: torch.Tensor, max_bbox_num
         iou = inter_area.float() / (SMOOTH + union.float())
 
         # reset iou for those padding bbox as 1
-        iou = torch.where((bbox_label[:, :, 0] + bbox_label[:, :, 1] + bbox_label[:, :, 2] + bbox_label[:, :, 3]) == 0,
-                          one, iou)
+        iou = torch.where(
+            (bbox_label[:, :, 0] + bbox_label[:, :, 1] + bbox_label[:, :, 2] + bbox_label[:, :, 3]) == 0,
+            one,
+            iou)
 
         # find the best matched bbox in the prediction
         iou, indices = torch.max(iou, 1)
 
         # total iou loss across the whole batch size.
-        batch_loss = torch.sum(1-iou) / (non_padding_cnt + SMOOTH)
-
-        iou_losses.append(batch_loss)
+        if non_padding_cnt > 0:
+            batch_loss = torch.sum(1 - iou) / (non_padding_cnt + SMOOTH)
+            iou_losses.append(batch_loss)
 
         # complexity_pred shape: (batch, max bbox num, 1)
         # find the complexity diff of the best matched bbox.
@@ -86,5 +87,6 @@ def iou_loss(bboxes_pred: torch.Tensor, bboxes_label: torch.Tensor, max_bbox_num
         complexity_loss = torch.abs(complexity_pred - complexity_label)
         complexity_losses.append(complexity_loss.mean())
 
-    #return sum(iou_losses) / max_bbox_num , sum(complexity_losses) / max_bbox_num
-    return torch.mean(torch.stack(iou_losses)), sum(complexity_losses) / max_bbox_num
+    if len(iou_losses):
+        return torch.mean(torch.stack(iou_losses)), sum(complexity_losses) / max_bbox_num
+    return torch.tensor([1.]).cuda(), sum(complexity_losses) / max_bbox_num

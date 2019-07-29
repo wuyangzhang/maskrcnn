@@ -6,7 +6,6 @@ how to calculate the IOU which requires to correctly map predicted
 region proposals to the labels.?
 '''
 import time
-from torch import nn
 import torch.optim
 from prediction import RPPNDataset
 
@@ -14,13 +13,14 @@ from prediction.convlstm import ConvLSTM
 from prediction.lstm import LSTM
 from prediction.rpp_loss import iou_loss
 from prediction.nms import nms
+from config import Config
 
 
 class PredictionDelegator:
     def __init__(self, config):
         self.config = config
         if config.pred_algo == 0:
-            self.model = LSTM(input_size=160, hidden_size=64, num_layers=4)
+            self.model = LSTM(input_size=160, hidden_size=64, window=config.window_size, num_layers=4)
         elif config.pred_algo == 1:
             self.model = ConvLSTM(input_channels=30, hidden_channels=[128, 64, 64, 32, 32], kernel_size=3)
         self.model.cuda()
@@ -34,29 +34,30 @@ class PredictionDelegator:
 models = ('lstm', 'convlstm')
 
 model = models[0]
+config = Config()
 
 # should convert the input shape to (batch_size, length(5), num of features(30*5))
+net = None
 if model == 'lstm':
-    net = LSTM(input_size=160, hidden_size=64, num_layers=2)
-elif model == 'convlstm':
-    net = ConvLSTM(input_channels=30, hidden_channels=[128, 64, 64, 32, 32], kernel_size=3)
+    net = LSTM(input_size=160, hidden_size=64, window=config.window_size, num_layers=2).cuda()
+    # net.load_state_dict(torch.load(config.model_path))
 
-# net.train()
-net.cuda()
+elif model == 'convlstm':
+    net = ConvLSTM(input_channels=30, hidden_channels=[128, 64, 64, 32, 32], kernel_size=3).cuda()
+
 
 '''optimizer & learning rate'''
-criterion = nn.MSELoss()
-optimizer = torch.optim.Adadelta(net.parameters(), lr=1e-3)
+optimizer = torch.optim.Adam(net.parameters(), lr=1e-2)
 
 '''data loader'''
-train_video_files = '/home/wuyang/kitty/training/seq_list.txt'
+train_video_files = config.home_addr + 'kitty/training/seq_list.txt'
 dataset = 'kitti'
 train_data = RPPNDataset(train_video_files, dataset)
-train_data_loader = train_data.getDataLoader(batch_size=32, shuffle=False)
+train_data_loader = train_data.getDataLoader(batch_size=32, window_size=config.window_size, shuffle=True)
 shape = train_data.shape
-test_video_files = '/home/wuyang/kitty/testing/seq_list.txt'
+test_video_files = config.home_addr + 'kitty/testing/seq_list.txt'
 
-eval_data_loader = RPPNDataset(test_video_files, dataset).getDataLoader(batch_size=32, shuffle=False)
+eval_data_loader = RPPNDataset(test_video_files, dataset).getDataLoader(batch_size=32, window_size=config.window_size, shuffle=False)
 
 '''
 training process
@@ -77,28 +78,17 @@ for epoch in range(100000):
         total_iter += 1
         iter_start_time = time.time()
         train_x, train_y, _ = data
-        #print(batch_id, train_x.shape)
 
         train_x = train_x.cuda()
         labels = train_y.cuda()
 
-        s1 = time.time()
         out = net(train_x)
 
-        s2 = time.time()
-        print(s2-s1)
-
         optimizer.zero_grad()
-
-        s1 = time.time()
         out = nms(out, shape)
-        s2 = time.time()
-        print('nms time', s2-s1)
 
-        s1 = time.time()
         loss_iou, loss_complexity = iou_loss(out, labels, max_bbox_num)
-        s2 = time.time()
-        print('iou time', s2-s1)
+
         loss = loss_iou
         #loss = loss_iou + loss_complexity * complexity_loss_weight
         loss.backward()
@@ -113,22 +103,22 @@ for epoch in range(100000):
         if epoch % save_freq == 0:
             torch.save(net.state_dict(), 'rppn_checkpoint.pth')
 
-    if epoch % eval_freq == 0:
-        # evaluate the model.
-        with torch.no_grad():
-            iou_losses, complexity_losses = [], []
-            for batch_id, data in enumerate(eval_data_loader):
-                train_x, train_y, _ = data
-                train_x = train_x.cuda()
-                train_y = train_y.cuda()
-                out = net(train_x)
-                out = nms(out, shape)
-                loss_iou, loss_complexity = iou_loss(out, train_y, max_bbox_num)
-                iou_losses.append(loss_iou)
-                complexity_losses.append(loss_complexity)
-
-        print('[Testing] IOU loss {}, computing complexity loss {} over the test dataset.'.
-              format(sum(iou_losses) / len(iou_losses), sum(complexity_losses) / len(complexity_losses)))
+    # if epoch % eval_freq == 0:
+    #     # evaluate the model.
+    #     with torch.no_grad():
+    #         iou_losses, complexity_losses = [], []
+    #         for batch_id, data in enumerate(eval_data_loader):
+    #             train_x, train_y, _ = data
+    #             train_x = train_x.cuda()
+    #             train_y = train_y.cuda()
+    #             out = net(train_x)
+    #             out = nms(out, shape)
+    #             loss_iou, loss_complexity = iou_loss(out, train_y, max_bbox_num)
+    #             iou_losses.append(loss_iou)
+    #             complexity_losses.append(loss_complexity)
+    #
+    #     print('[Testing] IOU loss {}, computing complexity loss {} over the test dataset.'.
+    #           format(sum(iou_losses) / len(iou_losses), sum(complexity_losses) / len(complexity_losses)))
 
 
 def resize(data: torch.Tensor):

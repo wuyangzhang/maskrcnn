@@ -2,7 +2,7 @@ from torch import nn
 
 
 class LSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers=4):
+    def __init__(self, input_size, hidden_size, window, num_layers=4):
         super(LSTM, self).__init__()
         self.hidden_size = hidden_size
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
@@ -12,7 +12,7 @@ class LSTM(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
         # designed for #2 input shape : batch_size, seq_length (total frame number), 5 features * 30 bbox/frame. Designed for LSTM input
-        self.reg = nn.Linear(5, 1)
+        self.reg = nn.Linear(window, 1)
 
         self.reg2 = nn.Linear(self.hidden_size, 160)
 

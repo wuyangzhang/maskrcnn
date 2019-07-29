@@ -9,13 +9,13 @@ from prediction.nms import nms
 from prediction.attention import EncoderRNN, AttnDecoderRNN
 
 config = Config()
-alg = 1
+alg = 2
 if alg == 1:
-    model = LSTM(input_size=160, hidden_size=64, num_layers=2).cuda()
+    model = LSTM(input_size=160, hidden_size=64, window=config.window_size, num_layers=2).cuda()
     model.load_state_dict(torch.load(config.model_path))
 elif alg == 2:
     encoder = EncoderRNN(160, 160).cuda()
-    decoder = AttnDecoderRNN(160, 160).cuda()
+    decoder = AttnDecoderRNN(160, 160, window_size=config.window_size).cuda()
     encode_path = 'en_rppn_checkpoint.pth'
     decode_path = 'de_rppn_checkpoint.pth'
 
@@ -24,10 +24,10 @@ elif alg == 2:
 
 
 def visualize():
-    test_video_files = '/home/wuyang/kitty/testing/seq_list.txt'
+    test_video_files = config.home_addr + 'kitty/testing/seq_list.txt'
     dataset = 'kitti'
     eval_data = RPPNDataset(test_video_files, dataset)
-    eval_data_loader = eval_data.getDataLoader(batch_size=1, shuffle=False)
+    eval_data_loader = eval_data.getDataLoader(batch_size=1, window_size=config.window_size, shuffle=False)
     shape = eval_data.shape
 
     for batch_id, data in enumerate(eval_data_loader):
@@ -58,10 +58,10 @@ def visualize():
 
         # show the ground truth result
         train_y = torch.squeeze(train_y)[:, :4]
-        train_y[:, 0] *= imgs[0].shape[1]
-        train_y[:, 1] *= imgs[0].shape[0]
-        train_y[:, 2] *= imgs[0].shape[1]
-        train_y[:, 3] *= imgs[0].shape[0]
+        # train_y[:, 0] *= imgs[0].shape[1]
+        # train_y[:, 1] *= imgs[0].shape[0]
+        # train_y[:, 2] *= imgs[0].shape[1]
+        # train_y[:, 3] *= imgs[0].shape[0]
         label_bbox = BoxList(train_y, imgs[0].shape[:2])
         label_image = render_bbox(label_bbox, label_img)
         b, g, r = cv2.split(label_image)  # get b,g,r
@@ -76,10 +76,10 @@ def visualize():
         elif alg == 2:
             encoder_hidden = encoder.initHidden()
             encoder_outputs = list()
-            input_length = train_x.size(1)
+            input_length = _train_x.size(1)
             for ei in range(input_length):
                 # get the tensor of a single timestamp
-                input = train_x[:, ei, :].reshape(train_x.size(0), 1, train_x.size(2))
+                input = _train_x[:, ei, :].reshape(_train_x.size(0), 1, _train_x.size(2))
                 encoder_output, encoder_hidden = encoder(input, encoder_hidden)
                 encoder_outputs.append(encoder_output)
 
@@ -90,10 +90,10 @@ def visualize():
 
         out = nms(out, shape)
         out = torch.squeeze(out)[:, :4]
-        out[:, 0] *= imgs[0].shape[1]
-        out[:, 1] *= imgs[0].shape[0]
-        out[:, 2] *= imgs[0].shape[1]
-        out[:, 3] *= imgs[0].shape[0]
+        # out[:, 0] *= imgs[0].shape[1]
+        # out[:, 1] *= imgs[0].shape[0]
+        # out[:, 2] *= imgs[0].shape[1]
+        # out[:, 3] *= imgs[0].shape[0]
         pred_bbox = BoxList(out, imgs[0].shape[:2])
         pred_image = render_bbox(pred_bbox, pred_img)
         b, g, r = cv2.split(pred_image)  # get b,g,r

@@ -5,8 +5,12 @@ import cv2
 
 from app.app_manager import ApplicationManager
 
-root_dir = '/home/wuyang/kitty/training/image_02/'
-output_dir = '/home/wuyang/kitty/training/seq_list.txt'
+from config import Config
+
+config = Config()
+
+root_dir = config.home_addr + 'kitty/training/image_02/'
+output_dir = config.home_addr + 'kitty/training/seq_list.txt'
 
 # from demo.mobile_client import MaskCompute
 
@@ -57,5 +61,5 @@ def process():
     f.close()
 
 
-cal_bbox(root_dir)
-# process()
+#cal_bbox(root_dir)
+process()

@@ -86,6 +86,8 @@ class RPPNDataset(Dataset):
             else:
                 start_video_index = index - self.prefix[l - 1]
 
+            x_scale, y_scale = random.uniform(0.9, 1.1), random.uniform(0.9, 1.1)
+
             # corner case: cannot find sufficient preceding or next video frames
             if start_video_index >= self.video_size[l] - 1 or start_video_index < self.window:
                 start_video_index = random.randint(self.window, self.video_size[l] - 2)
@@ -103,25 +105,31 @@ class RPPNDataset(Dataset):
             # format 2: input shape = batch_size, seq_length (total frame number), 5 features * 30 bbox/frame.
             # Designed for LSTM input. e.g., [16, 5, 160]
             for path in input_path:
-                input_tensors.append(torch.tensor(self.load_tensor(path, self.max_padding_len)).reshape(-1))
+                input_tensors.append(torch.tensor(self.load_tensor(path, self.max_padding_len, x_scale, y_scale)).reshape(-1))
             input_tensors = torch.stack(input_tensors)
 
             target_path = select_data + '/' + '0' * (6 - len(str(start_video_index + 1))) + str(
                 start_video_index + 1) + '.txt'
-            target_tensor = self.load_tensor(target_path, self.max_padding_len, padding=True)
+            target_tensor = self.load_tensor(target_path, self.max_padding_len, x_scale, y_scale, padding=True)
             target_tensor = torch.as_tensor(target_tensor).reshape(-1, 5)
             # target_tensor = torch.flatten(target_tensor)
             # input_tensors = torch.nn.utils.rnn.pad_sequence(input_tensors, batch_first=True)
+            target_tensor[:, 0] *= self.shape[1]
+            target_tensor[:, 1] *= self.shape[0]
+            target_tensor[:, 2] *= self.shape[1]
+            target_tensor[:, 3] *= self.shape[0]
+
             return input_tensors, target_tensor, input_path + [target_path]
 
         else:
             raise NotImplementedError
 
-    def getDataLoader(self, batch_size, shuffle=False):
+    def getDataLoader(self, batch_size, window_size, shuffle=False):
+        self.window = window_size
         return DataLoader(self, batch_size=batch_size, shuffle=shuffle)
 
     @staticmethod
-    def load_tensor(filepath, max_padding_len, padding=True):
+    def load_tensor(filepath, max_padding_len, x_scale = 1, y_scale = 1, padding=True):
         """
         load bbox's coordinates and computing complexity in a sing image.
         When the number of bbox is smaller than the max length, we pad
@@ -134,6 +142,10 @@ class RPPNDataset(Dataset):
             for line in f.readlines():
                 vals = line.split(' ')
                 vals = [float(val) for val in vals]
+                vals[0] *= x_scale
+                vals[2] *= x_scale
+                vals[1] *= y_scale
+                vals[3] *= y_scale
                 res.append(vals)
             # shuffle bbox sequence
             random.shuffle(res)

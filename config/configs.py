@@ -6,16 +6,18 @@ class Config:
         self.max_complexity = 50
         self.use_local = True
 
+        self.home_addr = '/home/wuyang/'
+        # self.home_addr = '/home/user/wz1_willRemoveOnJuly31/'
         # dataset
         self.eval_dataset = 'kitti'
         # kitti, h: 375, w: 1242
-        self.kitti_video_path = '/home/wuyang/kitty/testing/seq_list.txt'
+        self.kitti_video_path = self.home_addr + 'kitty/testing/seq_list.txt'
 
         # prediction manager
-        self.model_path = '/home/wuyang/maskrcnn-benchmark/prediction/rppn_checkpoint.pth'
+        self.model_path = self.home_addr + 'maskrcnn-benchmark/prediction/rppn_checkpoint.pth'
         self.pred_algos = ('lstm', 'convlstm')
         self.pred_algo = 0
-        self.max_queue_size = 5
+        self.window_size = 5
         self.padding = 32
 
         # partition manager
