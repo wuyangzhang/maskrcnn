@@ -148,7 +148,9 @@ class RPPNDataset(Dataset):
                 vals[3] *= y_scale
                 res.append(vals)
             # shuffle bbox sequence
-            random.shuffle(res)
+            #sorted(res, key=lambda bbox : bbox[0] ** 2 + bbox[1] ** 2)
+            res = sorted(res, key=lambda bbox : bbox[0])
+            # random.shuffle(res)
             if padding:
                 for _ in range(max_padding_len - len(res)):
                     res.append([0.0] * 5)

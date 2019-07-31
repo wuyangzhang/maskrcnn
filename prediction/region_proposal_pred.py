@@ -39,15 +39,15 @@ config = Config()
 # should convert the input shape to (batch_size, length(5), num of features(30*5))
 net = None
 if model == 'lstm':
-    net = LSTM(input_size=160, hidden_size=160, window=config.window_size, num_layers=1).cuda()
-    net.load_state_dict(torch.load(config.model_path))
+    net = LSTM(input_size=160, hidden_size=64, window=config.window_size, num_layers=2).cuda()
+    #net.load_state_dict(torch.load(config.model_path))
 
 elif model == 'convlstm':
-    net = ConvLSTM(input_channels=30, hidden_channels=[128, 64, 64, 32, 32], kernel_size=3).cuda()
+    net = ConvLSTM(input_channels=30, hidden_channels=[32, 1], kernel_size=3).cuda()
 
 
 '''optimizer & learning rate'''
-optimizer = torch.optim.Adam(net.parameters(), lr=1e-1)
+optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
 
 '''data loader'''
 train_video_files = config.home_addr + 'kitty/training/seq_list.txt'
@@ -67,10 +67,11 @@ training process
 total_iter = 0
 print_freq = 10
 eval_freq = 10
-save_freq = 1
+save_freq = 10
 h, w = 375, 1242
 max_bbox_num = 32
 complexity_loss_weight = 0.1
+
 
 for epoch in range(100000):
     for batch_id, data in enumerate(train_data_loader):
@@ -85,20 +86,26 @@ for epoch in range(100000):
         out = net(train_x)
 
         optimizer.zero_grad()
+
         out = nms(out, shape)
 
-        loss_iou, loss_complexity = iou_loss(out, labels, max_bbox_num)
+        loss_iou, loss_score, loss_complexity = iou_loss(out, labels, max_bbox_num)
 
-        loss = loss_iou
+        loss = loss_iou + loss_score
         #loss = loss_iou + loss_complexity * complexity_loss_weight
         loss.backward()
         # loss.backward()
         # loss_complexity.backward()
         optimizer.step()
         if total_iter % print_freq == 0:
-            print('Epoch: {}, batch {}, IoU loss:{:.5f}, computing complexity loss:{:.5f}'.format(epoch+1, batch_id + 1,
-                                                                                                  loss_iou.item(),
-                                                                                                  loss_complexity.item()))
+            print('Epoch: {}, batch {}, '
+                  'IoU loss:{:.5f}, '
+                  'score loss:{:.5f}, '
+                  'cc loss:{:.5f}'.format(
+                epoch+1, batch_id + 1,
+                loss_iou.item(),
+                loss_score.item(),
+                loss_complexity.item()))
 
         if epoch % save_freq == 0:
             torch.save(net.state_dict(), 'rppn_checkpoint.pth')

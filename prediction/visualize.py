@@ -11,7 +11,7 @@ from prediction.attention import EncoderRNN, AttnDecoderRNN
 config = Config()
 alg = 1
 if alg == 1:
-    model = LSTM(input_size=160, hidden_size=64, window=config.window_size, num_layers=4).cuda()
+    model = LSTM(input_size=160, hidden_size=64, window=config.window_size, num_layers=2).cuda()
     model.load_state_dict(torch.load(config.model_path))
 elif alg == 2:
     encoder = EncoderRNN(160, 160).cuda()
@@ -91,7 +91,7 @@ def visualize():
             # the decoder
             out, _, decoder_attention = decoder(encoder_outputs, encoder_hidden)
 
-        out = nms(out, shape)
+        out, scores = nms(out, shape)
         out = torch.squeeze(out)[:, :4]
         # out[:, 0] *= imgs[0].shape[1]
         # out[:, 1] *= imgs[0].shape[0]

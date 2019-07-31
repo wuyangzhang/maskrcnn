@@ -15,9 +15,11 @@ def nms(input_list, shape):
     hh, ww = shape
 
     inputs, scores = input_list
+
     # remove low score pred bbox
-    scores = scores.unsqueeze(2).repeat(1, 1, 5)
-    inputs = torch.where(scores > 0.5, inputs, zeros)
+    _scores = scores.repeat(1, 1, 5)
+    scores = torch.squeeze(scores, 2)
+    inputs = torch.where(_scores > 0.4, inputs, zeros)
 
     outputs = inputs.clone()
     outputs[:, :, 0] = inputs[:, :, 0] * ww
@@ -38,7 +40,6 @@ def nms(input_list, shape):
     outputs = torch.where(c, outputs, zeros)
 
     for batch_id, input in enumerate(outputs):
-        # outputs[batch_id, :] = torchvision.ops.nms(input[:, 4], torch.rand(input[:, 4].shape).cuda(), 0.6)
 
         x1 = input[:, 0]
         y1 = input[:, 1]
@@ -73,4 +74,4 @@ def nms(input_list, shape):
         pick = pick.reshape(1, -1).repeat(5, 1).transpose(0, 1)
         outputs[batch_id, :] = torch.where(pick.cuda(), input, zeros)
 
-    return outputs
+    return outputs, scores

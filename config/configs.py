@@ -1,4 +1,6 @@
 class Config:
+
+    score_threshold = 0.5
     def __init__(self):
         # general
         self.frame_height = None
@@ -14,7 +16,7 @@ class Config:
         self.kitti_video_path = self.home_addr + 'kitty/testing/seq_list.txt'
 
         # prediction manager
-        self.model_path = self.home_addr + 'maskrcnn-benchmark/prediction/rppn_checkpoint.pth'
+        self.model_path = self.home_addr + 'maskrcnn-benchmark/prediction/rppn_checkpoint30.pth'
         self.pred_algos = ('lstm', 'convlstm')
         self.pred_algo = 0
         self.window_size = 2
