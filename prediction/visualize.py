@@ -7,11 +7,12 @@ from prediction.lstm import LSTM
 from config import Config
 from prediction.nms import nms
 from prediction.attention import EncoderRNN, AttnDecoderRNN
+from prediction.preprocesing1 import reorder
 
 config = Config()
 alg = 1
 if alg == 1:
-    model = LSTM(input_size=160, hidden_size=64, window=config.window_size, num_layers=2).cuda()
+    model = LSTM(input_size=128, hidden_size=64, window=config.window_size, num_layers=2).cuda()
     model.load_state_dict(torch.load(config.model_path))
 elif alg == 2:
     encoder = EncoderRNN(160, 160).cuda()
@@ -33,6 +34,8 @@ def visualize():
     for batch_id, data in enumerate(eval_data_loader):
         train_x, train_y, path = data
         train_x = train_x.cuda()
+        train_x = train_x.reshape(train_x.shape[0], train_x.shape[1], -1, 5)
+        train_x = train_x[:, :, :, :4].reshape(train_x.shape[0], train_x.shape[1], -1)
         _train_x = train_x.clone().cuda()
         train_y = train_y.cuda()
         path = [p[0].split('.')[0] + '.png' for p in path]
@@ -42,10 +45,12 @@ def visualize():
 
         # historical bbox
         train_x = torch.squeeze(train_x)
-        if len(train_x.shape) == 1:
-            train_x = train_x.reshape(1, -1, 5)[:, :, :4]
-        else:
-            train_x = train_x.reshape(train_x.shape[0], -1, 5)[:, :, :4]
+        # if len(train_x.shape[0]) == 1:
+        #     train_x = train_x.reshape(1, -1, 4)[:, :, :4]
+        # else:
+        #     train_x = train_x.reshape(train_x.shape[0], -1, 4)[:, :, :4]
+        train_x = train_x.reshape(train_x.shape[0], -1, 4)[:, :, :4]
+
         train_x[:, :, 0] *= imgs[0].shape[1]
         train_x[:, :, 1] *= imgs[0].shape[0]
         train_x[:, :, 2] *= imgs[0].shape[1]
@@ -71,7 +76,7 @@ def visualize():
         label_image = cv2.merge([r, g, b])  # switch it to rgb
         plt.imshow(label_image)
         plt.show()
-
+        reorder(_train_x)
 
         # show the prediction result
         if alg == 1:

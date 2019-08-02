@@ -72,7 +72,7 @@ def iou_loss(bboxes_pred_in, bboxes_label: torch.Tensor, max_bbox_num=32):
 
         nonpadding_cnts.append(non_padding_cnt)
         iou_losses.append(torch.sum(1-iou))
-        complexity_pred = bboxes_pred[:, :, 4]
+        complexity_pred = bboxes_pred[:, :, 3]
         complexity_pred = complexity_pred[torch.arange(complexity_pred.shape[0]), indices]
         complexity_loss = mse_loss(complexity_pred, complexity_label)
         complexity_losses.append(complexity_loss)

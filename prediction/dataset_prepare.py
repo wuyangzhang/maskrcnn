@@ -33,7 +33,7 @@ class RPPNDataset(Dataset):
         :param batch_size: batch size
         :param max_padding_len: the max number of region proposal in an image
         """
-
+        #torch.manual_seed(0)
         self.window = window
         self.batch_size = batch_size
         self.dataset = dataset

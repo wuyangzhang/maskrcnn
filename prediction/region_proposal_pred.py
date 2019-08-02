@@ -13,6 +13,7 @@ from prediction.convlstm import ConvLSTM
 from prediction.lstm import LSTM
 from prediction.rpp_loss import iou_loss
 from prediction.nms import nms
+from prediction.preprocesing1 import reorder
 from config import Config
 
 
@@ -39,12 +40,12 @@ config = Config()
 # should convert the input shape to (batch_size, length(5), num of features(30*5))
 net = None
 if model == 'lstm':
-    net = LSTM(input_size=160, hidden_size=64, window=config.window_size, num_layers=2).cuda()
+    net = LSTM(input_size=128, hidden_size=64, window=config.window_size, num_layers=2).cuda()
     #net.load_state_dict(torch.load(config.model_path))
 
 elif model == 'convlstm':
-    net = ConvLSTM(input_channels=30, hidden_channels=[32, 1], kernel_size=3).cuda()
-
+    net = ConvLSTM(input_channels=1, hidden_channels=[32, 1], window_size=config.window_size, kernel_size=3).cuda()
+    #net.load_state_dict(torch.load(config.model_path))
 
 '''optimizer & learning rate'''
 optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
@@ -53,7 +54,7 @@ optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
 train_video_files = config.home_addr + 'kitty/training/seq_list.txt'
 dataset = 'kitti'
 train_data = RPPNDataset(train_video_files, dataset)
-train_data_loader = train_data.getDataLoader(batch_size=32, window_size=config.window_size, shuffle=True)
+train_data_loader = train_data.getDataLoader(batch_size=64, window_size=config.window_size, shuffle=True)
 shape = train_data.shape
 test_video_files = config.home_addr + 'kitty/testing/seq_list.txt'
 
@@ -74,25 +75,39 @@ complexity_loss_weight = 0.1
 
 
 for epoch in range(100000):
+
     for batch_id, data in enumerate(train_data_loader):
 
         total_iter += 1
         iter_start_time = time.time()
         train_x, train_y, _ = data
 
+
         train_x = train_x.cuda()
+        train_x = train_x.reshape(train_x.shape[0], train_x.shape[1], -1, 5)
+        train_x = train_x[:, :, :, :4].reshape(train_x.shape[0], train_x.shape[1], -1)
+
+        s = time.time()
+        train_x = reorder(train_x)
+        #print(time.time() - s)
         labels = train_y.cuda()
 
+        if model == 'convlstm':
+            train_x = train_x.reshape(train_x.shape[0], config.window_size, -1, 5)
+            train_x = train_x.unsqueeze(1)
+            train_x[:, :, :, :, 4] = 0
         out = net(train_x)
-
+        #print(time.time() - s)
         optimizer.zero_grad()
 
         out = nms(out, shape)
-
+        #print(time.time() - s)
         loss_iou, loss_score, loss_complexity = iou_loss(out, labels, max_bbox_num)
-
+        #print(time.time() - s)
+        #print('done')
         loss = loss_iou + loss_score
         #loss = loss_iou + loss_complexity * complexity_loss_weight
+
         loss.backward()
         # loss.backward()
         # loss_complexity.backward()
@@ -108,7 +123,7 @@ for epoch in range(100000):
                 loss_complexity.item()))
 
         if epoch % save_freq == 0:
-            torch.save(net.state_dict(), 'rppn_checkpoint.pth')
+            torch.save(net.state_dict(), 'lstm_checkpoint{}.pth'.format(epoch))
 
     # if epoch % eval_freq == 0:
     #     # evaluate the model.

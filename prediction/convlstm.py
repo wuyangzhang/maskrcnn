@@ -13,7 +13,7 @@ class GateConvLSTMCell(nn.Module):
     def __init__(self, input_channels, hidden_channels, kernel_size, bias=True, init_method='xavier_normal_'):
         super(GateConvLSTMCell, self).__init__()
 
-        assert hidden_channels % 2 == 0
+        #assert hidden_channels % 2 == 0
 
         self.input_channels = input_channels
         self.hidden_channels = hidden_channels
@@ -341,39 +341,50 @@ class AttenConvLSTM(nn.Module):
 
 class ConvLSTM(nn.Module):
 
-    def __init__(self, input_channels, hidden_channels, kernel_size, step, init_method, AttenMethod='b'):
+    def __init__(self, input_channels, hidden_channels, window_size, kernel_size=3, AttenMethod='b'):
         super(ConvLSTM, self).__init__()
 
-        self.convlstm = AttenConvLSTM(input_channels=in_channel, hidden_channels=hidden_channels,
-                             kernel_size=3, step=seq_length, init_method='xavier_normal_',
-                             AttenMethod='b').to(device)
+        self.convlstm = AttenConvLSTM(input_channels=input_channels, hidden_channels=hidden_channels,
+                             kernel_size=kernel_size, step=window_size, init_method='xavier_normal_',
+                             AttenMethod=AttenMethod)
 
+        self.relu = nn.ReLU()
+        self.score_lin = nn.Linear(4, 1)
 
     def forward(self, input):
-        pass
+        x = self.convlstm(input)[0]
+        x = x[:, :, -1, :, :].squeeze(1)
+        x = self.relu(x)
+        x = torch.sigmoid(x)
+        score = self.score_lin(x[:, :, :4])
+        score = torch.sigmoid(score)
+        return x, score
+        #x.shape = 1
 
 
 if __name__ == '__main__':
     # gradient check
-    b_s = 1
+    b_s = 16
     in_channel = 1
-    outchannel = 2
-    seq_length = 3
+    outchannel = 1
+    seq_length = 5
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    convlstm = AttenConvLSTM(input_channels=in_channel, hidden_channels=[256, outchannel],
-                             kernel_size=3, step=seq_length, init_method='xavier_normal_',
+    convlstm = ConvLSTM(input_channels=in_channel, hidden_channels=[64, outchannel],
+                             kernel_size=3, window_size=seq_length,
                              AttenMethod='b').to(device)
     # init_method = xavier_normal_ / kaiming_normal_ / orthogonal_
     loss_fn = torch.nn.MSELoss()
 
-    input = Variable(torch.randn(b_s, in_channel, seq_length, 32, 5)).cuda()
-    target = Variable(torch.randn(b_s, outchannel, 1, 32, 5)).double().cuda()
+    # 32, 1, window, 32, 5
+    input = torch.randn(b_s, in_channel, seq_length, 32, 5).cuda()
+    target = torch.randn(b_s, 32, 5).double().cuda()
 
     import time
     for i in range(30):
         s = time.time()
         output = convlstm(input)
         print('done', time.time()-s)
-    output = output[0][0]
+    #output = output[0][0]
+    output = output.double()
     res = torch.autograd.gradcheck(loss_fn, (output, target), eps=1e-6, raise_exception=True)
     print(res)

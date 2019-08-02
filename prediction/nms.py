@@ -9,7 +9,7 @@ def nms(input_list, shape):
     '''
 
     zero = torch.tensor([0.]).cuda()
-    zeros = torch.tensor([0.] * 5).cuda()
+    zeros = torch.tensor([0.] * 4).cuda()
 
     SMOOTH = torch.tensor([1e-6]).cuda()
     hh, ww = shape
@@ -17,7 +17,7 @@ def nms(input_list, shape):
     inputs, scores = input_list
 
     # remove low score pred bbox
-    _scores = scores.repeat(1, 1, 5)
+    _scores = scores.repeat(1, 1, 4)
     scores = torch.squeeze(scores, 2)
     inputs = torch.where(_scores > 0.4, inputs, zeros)
 
@@ -32,11 +32,11 @@ def nms(input_list, shape):
 
     # remove invalid bbox
     c = outputs[:, :, 0] < outputs[:, :, 2]
-    c = c.unsqueeze(2).repeat(1, 1, 5)
+    c = c.unsqueeze(2).repeat(1, 1, 4)
     outputs = torch.where(c, outputs, zeros)
 
     c = outputs[:, :, 1] < outputs[:, :, 3]
-    c = c.unsqueeze(2).repeat(1, 1, 5)
+    c = c.unsqueeze(2).repeat(1, 1, 4)
     outputs = torch.where(c, outputs, zeros)
 
     for batch_id, input in enumerate(outputs):
@@ -68,10 +68,10 @@ def nms(input_list, shape):
             overlap = (w * h) / (area[batch_id, idxs] + SMOOTH)
 
             # keep all indexes from the index list that have small overlaps
-            idxs = idxs[overlap < 0.5]
+            idxs = idxs[overlap < 0.6]
             idxs = idxs[:-1]
 
-        pick = pick.reshape(1, -1).repeat(5, 1).transpose(0, 1)
+        pick = pick.reshape(1, -1).repeat(4, 1).transpose(0, 1)
         outputs[batch_id, :] = torch.where(pick.cuda(), input, zeros)
 
     return outputs, scores
