@@ -12,8 +12,8 @@ from prediction.preprocesing1 import reorder
 config = Config()
 alg = 1
 if alg == 1:
-    model = LSTM(input_size=64, hidden_size=128, window=config.window_size, num_layers=2).cuda()
-    #model.load_state_dict(torch.load(config.model_path))
+    model = LSTM(input_size=128, hidden_size=64, window=config.window_size, num_layers=2).cuda()
+    model.load_state_dict(torch.load(config.model_path))
 elif alg == 2:
     encoder = EncoderRNN(160, 160).cuda()
     decoder = AttnDecoderRNN(160, 160, window_size=config.window_size).cuda()
@@ -66,20 +66,20 @@ def visualize():
 
         # show the ground truth result
         train_y = torch.squeeze(train_y)[:, :4]
-        # train_y[:, 0] *= imgs[0].shape[1]
-        # train_y[:, 1] *= imgs[0].shape[0]
-        # train_y[:, 2] *= imgs[0].shape[1]
-        # train_y[:, 3] *= imgs[0].shape[0]
+        train_y[:, 0] *= imgs[0].shape[1]
+        train_y[:, 1] *= imgs[0].shape[0]
+        train_y[:, 2] *= imgs[0].shape[1]
+        train_y[:, 3] *= imgs[0].shape[0]
         label_bbox = BoxList(train_y, imgs[0].shape[:2])
         label_image = render_bbox(label_bbox, label_img)
         b, g, r = cv2.split(label_image)  # get b,g,r
         label_image = cv2.merge([r, g, b])  # switch it to rgb
         plt.imshow(label_image)
         plt.show()
-        reorder(_train_x)
 
         # show the prediction result
         if alg == 1:
+            _train_x = reorder(_train_x)
             out = model(_train_x)
         elif alg == 2:
             encoder_hidden = encoder.initHidden()
@@ -98,10 +98,10 @@ def visualize():
 
         out, scores = nms(out, shape)
         out = torch.squeeze(out)[:, :4]
-        # out[:, 0] *= imgs[0].shape[1]
-        # out[:, 1] *= imgs[0].shape[0]
-        # out[:, 2] *= imgs[0].shape[1]
-        # out[:, 3] *= imgs[0].shape[0]
+        out[:, 0] *= imgs[0].shape[1]
+        out[:, 1] *= imgs[0].shape[0]
+        out[:, 2] *= imgs[0].shape[1]
+        out[:, 3] *= imgs[0].shape[0]
         pred_bbox = BoxList(out, imgs[0].shape[:2])
         pred_image = render_bbox(pred_bbox, pred_img)
         b, g, r = cv2.split(pred_image)  # get b,g,r

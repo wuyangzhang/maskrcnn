@@ -114,10 +114,10 @@ class RPPNDataset(Dataset):
             target_tensor = torch.as_tensor(target_tensor).reshape(-1, 5)
             # target_tensor = torch.flatten(target_tensor)
             # input_tensors = torch.nn.utils.rnn.pad_sequence(input_tensors, batch_first=True)
-            target_tensor[:, 0] *= self.shape[1]
-            target_tensor[:, 1] *= self.shape[0]
-            target_tensor[:, 2] *= self.shape[1]
-            target_tensor[:, 3] *= self.shape[0]
+            # target_tensor[:, 0] *= self.shape[1]
+            # target_tensor[:, 1] *= self.shape[0]
+            # target_tensor[:, 2] *= self.shape[1]
+            # target_tensor[:, 3] *= self.shape[0]
 
             return input_tensors, target_tensor, input_path + [target_path]
 

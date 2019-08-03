@@ -2,6 +2,15 @@ import torch
 
 SMOOTH = torch.tensor([1e-6]).cuda()
 inf = torch.tensor([float('inf')]).cuda()
+zero = torch.tensor([0.]).cuda()
+
+
+def remove_tiny_bbox(inputs):
+
+    area = (inputs[:, :, 2] - inputs[:, :, 0]) * (inputs[:, :, 3] - inputs[:, :, 1])
+    # find & remove tiny objects..
+    is_tiny_area = (area <= 0.0015).unsqueeze(-1).repeat(1, 1, 5)
+    return torch.where(is_tiny_area, zero, inputs)
 
 
 def reorder(inputs):
@@ -13,9 +22,14 @@ def reorder(inputs):
     :param inputs:
     :return:
     '''
-    # shape (b, time, features)
-    # 16 * 5 * 160
+
     inputs = inputs.reshape(inputs.shape[0], inputs.shape[1], -1, 4)
+
+    area = (inputs[:, :, :, 2] - inputs[:, :, :, 0]) * (inputs[:, :, :, 3] - inputs[:, :, :, 1])
+
+    # find & remove tiny objects..
+    is_tiny_area = (area <= 0.0015).unsqueeze(-1).repeat(1, 1, 1, 4)
+    inputs = torch.where(is_tiny_area, zero, inputs)
 
     free_slot_start_index = torch.sum(inputs[:, 0, :, 0] + inputs[:, 0, :, 1] \
                                       + inputs[:, 0, :, 2] + inputs[:, 0, :, 3] != 0, dim=1)
@@ -38,8 +52,8 @@ def reorder(inputs):
         # bbox1 is for t , bbox2 is for t + 1
         bbox1, bbox2 = inputs[:, t - 1, :, :], inputs[:, t, :, :]
 
-        bbox2_area = (bbox2[:, :, 2] - bbox2[:, :, 0]) * (bbox2[:, :, 3] - bbox2[:, :, 1])
-
+        #bbox2_area = (bbox2[:, :, 2] - bbox2[:, :, 0]) * (bbox2[:, :, 3] - bbox2[:, :, 1])
+        bbox2_area = area[:, t, :]
         # iterate bbox at t, and the find the best match one at t + 1
         for box_id in range(inputs.shape[2]):
             # bbox_label => 16 * 32 * 5
@@ -63,22 +77,27 @@ def reorder(inputs):
             bbox_area_ratio = torch.where(offset_mask, bbox_area_ratio, inf)
 
             # find the best matched bbox in the prediction, shape batch, 32
-            best_area_ratio, indices = torch.min(bbox_area_ratio, 1)
+            #best_area_ratio, indices = torch.min(bbox_area_ratio, 1)
+
+            best_ratio, indices = torch.min(bbox_area_ratio + bbox_x_ratio + bbox_y_ratio, 1)
 
             # set a hard threshold for the area matching. (batch)
-            area_ratio_mask = best_area_ratio < 0.3
+            area_ratio_mask = best_ratio < 0.4
 
             new_order[area_ratio_mask, box_id, :] = bbox2[area_ratio_mask, indices[area_ratio_mask], :]
 
+            # reuse previous bbox as the value
+            new_order[~area_ratio_mask, box_id, :] = bbox1[~area_ratio_mask, box_id, :]
+
             used[area_ratio_mask, indices[area_ratio_mask]] = 1
 
-        for batch_id in range(used.shape[0]):
-            # append unused bbox at t + 1 to new_order. start from free slot.
-            unused_len = torch.sum(~used[batch_id], dim=0)
-            if free_slot_start_index[batch_id] + unused_len < 32:
-                new_order[batch_id, free_slot_start_index[batch_id]: free_slot_start_index[batch_id] + unused_len, :] = bbox2[batch_id, ~used[batch_id]]
-                # update free slot
-            free_slot_start_index[batch_id] += unused_len
+        # for batch_id in range(used.shape[0]):
+        #     # append unused bbox at t + 1 to new_order. start from free slot.
+        #     unused_len = torch.sum(~used[batch_id], dim=0)
+        #     if free_slot_start_index[batch_id] + unused_len < 32:
+        #         new_order[batch_id, free_slot_start_index[batch_id]: free_slot_start_index[batch_id] + unused_len, :] = bbox2[batch_id, ~used[batch_id]]
+        #         # update free slot
+        #     free_slot_start_index[batch_id] += unused_len
 
             # reset the bbox  at t+1
         inputs[:, t, :, :] = new_order

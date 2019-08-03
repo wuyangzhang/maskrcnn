@@ -77,29 +77,6 @@ class AttnDecoderRNN(nn.Module):
         return torch.zeros(1, 1, self.hidden_size).cuda()
 
 
-def train_iter(input_tensor: torch.tensor, target_tensor: torch.tensor,
-               encoder: EncoderRNN, decoder: AttnDecoderRNN,
-               encoder_optimizer, decoder_optimizer):
-    encoder_optimizer.zero_grad()
-    decoder_optimizer.zero_grad()
-
-    encoder_hidden = encoder.initHidden()
-
-    input_length = input_tensor.size(1)
-    encoder_outputs = list()
-
-    # iterate the last K timestamps
-    for ei in range(input_length):
-        input = input_tensor[:, ei, :].reshape(input_tensor.size(0), 1, input_tensor.size(2))
-        encoder_output, encoder_hidden = encoder(input, encoder_hidden)
-        encoder_outputs.append(encoder_output)
-
-    # cat all the outputs from the encoder
-    encoder_outputs = torch.cat(encoder_outputs, dim=1)
-
-    # the decoder
-    decoder_output, decoder_attention = decoder(encoder_outputs, encoder_hidden)
-
 
 def train():
     config = Config()

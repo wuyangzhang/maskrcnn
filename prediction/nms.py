@@ -22,10 +22,10 @@ def nms(input_list, shape):
     inputs = torch.where(_scores > 0.4, inputs, zeros)
 
     outputs = inputs.clone()
-    outputs[:, :, 0] = inputs[:, :, 0] * ww
-    outputs[:, :, 1] = inputs[:, :, 1] * hh
-    outputs[:, :, 2] = inputs[:, :, 2] * ww
-    outputs[:, :, 3] = inputs[:, :, 3] * hh
+    # outputs[:, :, 0] = inputs[:, :, 0] * ww
+    # outputs[:, :, 1] = inputs[:, :, 1] * hh
+    # outputs[:, :, 2] = inputs[:, :, 2] * ww
+    # outputs[:, :, 3] = inputs[:, :, 3] * hh
 
     area = torch.max((outputs[:, :, 2] - outputs[:, :, 0] + 1) * (outputs[:, :, 3] - outputs[:, :, 1] + 1),
                      torch.tensor([0.]).cuda())
