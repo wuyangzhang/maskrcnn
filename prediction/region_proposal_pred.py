@@ -40,7 +40,7 @@ config = Config()
 # should convert the input shape to (batch_size, length(5), num of features(30*5))
 net = None
 if model == 'lstm':
-    net = LSTM(input_size=128, hidden_size=64, window=config.window_size, num_layers=2).cuda()
+    net = LSTM(input_size=64, hidden_size=128, window=config.window_size, num_layers=2).cuda()
     #net.load_state_dict(torch.load(config.model_path))
 
 elif model == 'convlstm':
@@ -48,7 +48,7 @@ elif model == 'convlstm':
     #net.load_state_dict(torch.load(config.model_path))
 
 '''optimizer & learning rate'''
-optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
+optimizer = torch.optim.Adam(net.parameters(), lr=1e-2)
 
 '''data loader'''
 train_video_files = config.home_addr + 'kitty/training/seq_list.txt'

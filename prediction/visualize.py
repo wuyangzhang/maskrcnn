@@ -12,8 +12,8 @@ from prediction.preprocesing1 import reorder
 config = Config()
 alg = 1
 if alg == 1:
-    model = LSTM(input_size=128, hidden_size=64, window=config.window_size, num_layers=2).cuda()
-    model.load_state_dict(torch.load(config.model_path))
+    model = LSTM(input_size=64, hidden_size=128, window=config.window_size, num_layers=2).cuda()
+    #model.load_state_dict(torch.load(config.model_path))
 elif alg == 2:
     encoder = EncoderRNN(160, 160).cuda()
     decoder = AttnDecoderRNN(160, 160, window_size=config.window_size).cuda()

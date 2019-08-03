@@ -86,8 +86,8 @@ class RPPNDataset(Dataset):
             else:
                 start_video_index = index - self.prefix[l - 1]
 
-            #x_scale, y_scale = random.uniform(0.9, 1.1), random.uniform(0.9, 1.1)
-            x_scale = y_scale = 1
+            x_scale, y_scale = random.uniform(0.97, 1.03), random.uniform(0.97, 1.03)
+            #x_scale = y_scale = 1
             # corner case: cannot find sufficient preceding or next video frames
             if start_video_index >= self.video_size[l] - 1 or start_video_index < self.window:
                 start_video_index = random.randint(self.window, self.video_size[l] - 2)
