@@ -12,7 +12,7 @@ from prediction.preprocesing1 import reorder
 config = Config()
 alg = 1
 if alg == 1:
-    model = LSTM(input_size=128, hidden_size=64, window=config.window_size, num_layers=2).cuda()
+    model = LSTM(input_size=128, hidden_size=256, window=config.window_size, num_layers=2).cuda()
     model.load_state_dict(torch.load(config.model_path))
 elif alg == 2:
     encoder = EncoderRNN(160, 160).cuda()
@@ -35,8 +35,11 @@ def visualize():
         train_x, train_y, path = data
         train_x = train_x.cuda()
         train_x = train_x.reshape(train_x.shape[0], train_x.shape[1], -1, 5)
+
+        _train_x = train_x.clone()
+        _train_x = _train_x[:, :, :, :4]
         train_x = train_x[:, :, :, :4].reshape(train_x.shape[0], train_x.shape[1], -1)
-        _train_x = train_x.clone().cuda()
+
         train_y = train_y.cuda()
         path = [p[0].split('.')[0] + '.png' for p in path]
         imgs = [cv2.imread(p) for p in path]
@@ -96,7 +99,8 @@ def visualize():
             # the decoder
             out, _, decoder_attention = decoder(encoder_outputs, encoder_hidden)
 
-        out, scores = nms(out, shape)
+        #out, scores = nms(out, shape)
+        out = out[0]
         out = torch.squeeze(out)[:, :4]
         out[:, 0] *= imgs[0].shape[1]
         out[:, 1] *= imgs[0].shape[0]

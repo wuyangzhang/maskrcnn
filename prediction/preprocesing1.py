@@ -23,13 +23,15 @@ def reorder(inputs):
     :return:
     '''
 
-    inputs = inputs.reshape(inputs.shape[0], inputs.shape[1], -1, 4)
+    #inputs = inputs.reshape(inputs.shape[0], inputs.shape[1], -1, 4)
 
     area = (inputs[:, :, :, 2] - inputs[:, :, :, 0]) * (inputs[:, :, :, 3] - inputs[:, :, :, 1])
 
     # find & remove tiny objects..
     is_tiny_area = (area <= 0.0015).unsqueeze(-1).repeat(1, 1, 1, 4)
-    inputs = torch.where(is_tiny_area, zero, inputs)
+    inputs = torch.where(is_tiny_area, torch.tensor([0.]).cuda(), inputs)
+
+    area = (inputs[:, :, :, 2] - inputs[:, :, :, 0]) * (inputs[:, :, :, 3] - inputs[:, :, :, 1])
 
     free_slot_start_index = torch.sum(inputs[:, 0, :, 0] + inputs[:, 0, :, 1] \
                                       + inputs[:, 0, :, 2] + inputs[:, 0, :, 3] != 0, dim=1)
@@ -38,12 +40,12 @@ def reorder(inputs):
     for t in range(1, inputs.shape[1]):
 
         # whether a bbox at t+1 has been selected as the best matching for bbox at t
-        used = torch.zeros(inputs.shape[0], inputs.shape[2]).byte().cuda()
-        used = torch.where(inputs[:, t, :, 0] + inputs[:, t, :, 1] +
-                           inputs[:, t, :, 2] + inputs[:, t, :, 3] != 0,
-                           used,
-                           torch.tensor([1]).byte().cuda()
-                           )
+        # used = torch.zeros(inputs.shape[0], inputs.shape[2]).byte().cuda()
+        # used = torch.where(inputs[:, t, :, 0] + inputs[:, t, :, 1] +
+        #                    inputs[:, t, :, 2] + inputs[:, t, :, 3] != 0,
+        #                    used,
+        #                    torch.tensor([1]).byte().cuda()
+        #                    )
 
         # will reorder the bbox at t + 1
         # new order for inputs[:, t:, :, :], shape: batch * 32 * 5
@@ -74,7 +76,7 @@ def reorder(inputs):
             bbox_area_ratio = torch.abs(1 - bbox_prev_area / bbox2_area)
 
             # mask candidate box that are too far from the target
-            bbox_area_ratio = torch.where(offset_mask, bbox_area_ratio, inf)
+            bbox_area_ratio = torch.where(offset_mask, bbox_area_ratio, torch.tensor([float('inf')]).cuda())
 
             # find the best matched bbox in the prediction, shape batch, 32
             #best_area_ratio, indices = torch.min(bbox_area_ratio, 1)
@@ -89,7 +91,7 @@ def reorder(inputs):
             # reuse previous bbox as the value
             new_order[~area_ratio_mask, box_id, :] = bbox1[~area_ratio_mask, box_id, :]
 
-            used[area_ratio_mask, indices[area_ratio_mask]] = 1
+            #used[area_ratio_mask, indices[area_ratio_mask]] = 1
 
         # for batch_id in range(used.shape[0]):
         #     # append unused bbox at t + 1 to new_order. start from free slot.

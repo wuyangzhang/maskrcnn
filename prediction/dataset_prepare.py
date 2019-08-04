@@ -153,7 +153,7 @@ class RPPNDataset(Dataset):
             # random.shuffle(res)
             if padding:
                 for _ in range(max_padding_len - len(res)):
-                    res.append([0.0] * 5)
+                    res.insert(0, [0.0] * 5)
             return res
 
 
