@@ -8,7 +8,7 @@ class Config:
         self.max_complexity = 50
         self.use_local = True
 
-        self.home_addr = '/home/wuyang/'
+        self.home_addr = '/home/nvidia/'
         # self.home_addr = '/home/user/wz1_willRemoveOnJuly31/'
         # dataset
         self.eval_dataset = 'kitti'
@@ -16,10 +16,12 @@ class Config:
         self.kitti_video_path = self.home_addr + 'kitty/testing/seq_list.txt'
 
         # prediction manager
-        self.model_path = self.home_addr + 'maskrcnn-benchmark/prediction/lstm_checkpoint5.pth'
+        self.model_path = self.home_addr + 'maskrcnn-benchmark/prediction/models/' \
+                                           'lstm_single_checkpoint15.pth'
+
         self.pred_algos = ('lstm', 'convlstm')
         self.pred_algo = 0
-        self.window_size = 5
+        self.window_size = 4
         self.padding = 32
 
         # partition manager

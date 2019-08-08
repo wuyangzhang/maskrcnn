@@ -47,8 +47,8 @@ def iou_loss(bboxes_pred_in, bboxes_label: torch.Tensor, max_bbox_num=32):
         inter_area = (x2 - x1) * (y2 - y1)
 
         # intersection area cannot be neg, clean invalid ones
-        inter_area = torch.where(x2 > x1, inter_area, zero)
-        inter_area = torch.where(y2 > y1, inter_area, zero)
+        inter_area = torch.where(x2 > x1, inter_area, torch.tensor([0.]).cuda())
+        inter_area = torch.where(y2 > y1, inter_area, torch.tensor([0.]).cuda())
 
         bbox_pred_area = (bboxes_pred[:, :, 2] - bboxes_pred[:, :, 0]) * \
                          (bboxes_pred[:, :, 3] - bboxes_pred[:, :, 1])
@@ -59,12 +59,12 @@ def iou_loss(bboxes_pred_in, bboxes_label: torch.Tensor, max_bbox_num=32):
         union = bbox_pred_area + bbox_label_area - inter_area
 
         #iou = inter_area.float() / (SMOOTH + union.float())
-        iou = inter_area / (SMOOTH + union)
+        iou = inter_area / (torch.tensor([1e-6]).cuda() + union)
 
         # reset iou for those padding bbox as 1
         iou = torch.where(
             (bbox_label[:, :, 0] + bbox_label[:, :, 1] + bbox_label[:, :, 2] + bbox_label[:, :, 3]) == 0,
-            one,
+            torch.tensor([1.]).cuda(),
             iou)
 
         # find the best matched bbox in the prediction
@@ -77,7 +77,7 @@ def iou_loss(bboxes_pred_in, bboxes_label: torch.Tensor, max_bbox_num=32):
         complexity_loss = mse_loss(complexity_pred, complexity_label)
         complexity_losses.append(complexity_loss)
 
-    loss_iou = torch.sum(torch.stack(iou_losses)) / (torch.sum(torch.stack(nonpadding_cnts)) + SMOOTH)
+    loss_iou = torch.sum(torch.stack(iou_losses)) / (torch.sum(torch.stack(nonpadding_cnts)) + torch.tensor([1e-6]).cuda())
 
     # reverse way bbox score calculate
     '''
@@ -115,8 +115,8 @@ def iou_loss(bboxes_pred_in, bboxes_label: torch.Tensor, max_bbox_num=32):
 
         # inter_area (32, 32)
         inter_area = (x2 - x1) * (y2 - y1)
-        inter_area = torch.where(x2 > x1, inter_area, zero)
-        inter_area = torch.where(y2 > y1, inter_area, zero)
+        inter_area = torch.where(x2 > x1, inter_area, torch.tensor([0.]).cuda())
+        inter_area = torch.where(y2 > y1, inter_area, torch.tensor([0.]).cuda())
 
         bbox_pred_area = (bbox_pred[:, :, 2] - bbox_pred[:, :, 0]) * \
                          (bbox_pred[:, :, 3] - bbox_pred[:, :, 1])
@@ -127,18 +127,18 @@ def iou_loss(bboxes_pred_in, bboxes_label: torch.Tensor, max_bbox_num=32):
         union = bbox_pred_area + bbox_label_area - inter_area
 
         # iou (32, 32)
-        iou = inter_area / (SMOOTH + union)
+        iou = inter_area / (torch.tensor([1e-6]).cuda() + union)
 
         # set iou as zero if the bbox is padding
         iou = torch.where(
             (bbox_pred[:, :, 0] + bbox_pred[:, :, 1] + bbox_pred[:, :, 2] + bbox_pred[:, :, 3] == 0),
-            one,
+            torch.tensor([1.]).cuda(),
             iou
         )
 
         iou = torch.where(
             score <= 0.4,
-            one,
+            torch.tensor([1.]).cuda(),
             iou
         )
 
@@ -148,5 +148,5 @@ def iou_loss(bboxes_pred_in, bboxes_label: torch.Tensor, max_bbox_num=32):
         score_losses.append(torch.sum(1-iou))
 
     loss_score = torch.sum(torch.stack(score_losses)) \
-                 / (torch.sum(torch.stack(valid_cnts)) + SMOOTH)
+                 / (torch.sum(torch.stack(valid_cnts)) + torch.tensor([1e-6]).cuda())
     return loss_iou, loss_score, sum(complexity_losses) / max_bbox_num

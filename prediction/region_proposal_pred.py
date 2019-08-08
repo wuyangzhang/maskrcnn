@@ -11,10 +11,10 @@ import torch.optim
 from prediction import RPPNDataset
 
 from prediction.convlstm import ConvLSTM
-from prediction.lstm import LSTM
+from prediction.lstm_single import LSTM
 from prediction.rpp_loss import iou_loss
 from prediction.nms import nms
-from prediction.preprocesing1 import reorder, remove_tiny_bbox
+from prediction.preprocesing1 import reorder, remove_tiny_bbox, covert_xyxy_center
 from config import Config
 
 
@@ -41,13 +41,14 @@ config = Config()
 # should convert the input shape to (batch_size, length(5), num of features(30*5))
 net = None
 if model == 'lstm':
-    net = LSTM(input_size=128, hidden_size=256, window=config.window_size, num_layers=2).cuda()
+    net = LSTM(input_size=4, hidden_size=16, window=config.window_size, num_layers=2).cuda()
     #net.load_state_dict(torch.load(config.model_path))
 
 elif model == 'convlstm':
     net = ConvLSTM(input_channels=1, hidden_channels=[32, 1], window_size=config.window_size, kernel_size=3).cuda()
     #net.load_state_dict(torch.load(config.model_path))
 
+net.train()
 '''optimizer & learning rate'''
 optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
 
@@ -55,7 +56,7 @@ optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
 train_video_files = config.home_addr + 'kitty/training/seq_list.txt'
 dataset = 'kitti'
 train_data = RPPNDataset(train_video_files, dataset)
-train_data_loader = train_data.getDataLoader(batch_size=16, window_size=config.window_size, shuffle=True)
+train_data_loader = train_data.getDataLoader(batch_size=1, window_size=config.window_size, shuffle=True)
 shape = train_data.shape
 test_video_files = config.home_addr + 'kitty/testing/seq_list.txt'
 
@@ -73,47 +74,40 @@ save_freq = 5
 h, w = 375, 1242
 max_bbox_num = 32
 complexity_loss_weight = 0.1
-
+torch.manual_seed(0)
 mse = nn.MSELoss()
 
 for epoch in range(100000):
 
-    h_state = None
     for batch_id, data in enumerate(train_data_loader):
 
         total_iter += 1
         iter_start_time = time.time()
         train_x, train_y, _ = data
 
+        s = time.time()
         train_x = train_x.cuda()
+
         train_x = train_x.reshape(train_x.shape[0], train_x.shape[1], -1, 5)
         train_x = train_x[:, :, :, :4]#.reshape(train_x.shape[0], train_x.shape[1], -1)
 
-        #s = time.time()
         train_x = reorder(train_x)
-        #print(time.time() - s)
+
+        train_x = train_x.reshape(train_x.shape[0], train_x.shape[1], -1, 4)
+        #train_x = covert_xyxy_center(train_x)
+
         # labels = train_y.cuda()
         # labels = remove_tiny_bbox(labels)
-        labels = train_x[:, -1, :].reshape(train_x.shape[0], -1, 4)
-        if model == 'convlstm':
-            train_x = train_x.reshape(train_x.shape[0], config.window_size, -1, 5)
-            train_x = train_x.unsqueeze(1)
-            train_x[:, :, :, :, 4] = 0
-        out = net(train_x)
-        #print(time.time() - s)
+        labels = train_x[:, -1, :, :]
+        train_x = train_x.reshape(train_x.shape[0], train_x.shape[1], -1)
 
-        loss = mse(out[0], labels)
-        #out = nms(out, shape)
-
-        # loss_iou, loss_score, loss_complexity = iou_loss(out, labels, max_bbox_num)
-        #
-        # loss = loss_iou + loss_score
+        x, score, loss = net(train_x, labels)
 
         optimizer.zero_grad()
         loss.backward()
-        # loss.backward()
-        # loss_complexity.backward()
         optimizer.step()
+
+
         if total_iter % print_freq == 0:
             print('Epoch: {}, batch {}, '
                   'IoU loss:{:.5f}, '
@@ -122,9 +116,9 @@ for epoch in range(100000):
                 epoch+1, batch_id + 1,
                 loss.item(),
                 loss.item(),loss.item()))
-                 # loss_iou.item(),
-                 # loss_score.item(),
-                 # loss_complexity.item()))
+                #  loss_iou.item(),
+                #  loss_score.item(),
+                #  loss_complexity.item()))
 
         if epoch % save_freq == 0:
             torch.save(net.state_dict(), 'lstm_checkpoint{}.pth'.format(epoch))
@@ -147,12 +141,5 @@ for epoch in range(100000):
     #           format(sum(iou_losses) / len(iou_losses), sum(complexity_losses) / len(complexity_losses)))
 
 
-def resize(data: torch.Tensor):
-    bbox, complexity = data[:, :, :4], data[:, :, 4]
-    bbox[:, :, 0] = bbox[:, :, 0] * h
-    bbox[:, :, 1] = bbox[:, :, 1] * w
-    bbox[:, :, 2] = bbox[:, :, 2] * h
-    bbox[:, :, 3] = bbox[:, :, 3] * w
-    bbox = bbox.int()
-    return bbox, complexity
+
 

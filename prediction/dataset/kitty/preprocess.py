@@ -1,4 +1,6 @@
 import os
+import sys
+sys.path.append('/home/nvidia/maskrcnn/')
 import glob
 
 import cv2
