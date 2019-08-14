@@ -71,7 +71,7 @@ def plot():
 
     # create sns
     ax = sns.boxplot(x='pos', y='val', hue='dataset', data=df,
-                     palette=sns.cubehelix_palette(8))
+                     palette='inferno')
 
     # edit the plot
     ax.spines['top'].set_visible(False)

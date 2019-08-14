@@ -88,10 +88,8 @@ def plot():
 
     ax = sns.catplot(x='type', y='val', hue='cost_weight', data=df,
 
-                     palette=sns.cubehelix_palette(8), kind='bar', legend_out=False)
+                     palette='inferno', kind='bar', legend_out=False)
 
-    # legend = ax._legend
-    # legend._loc = 1
     plt.gcf().set_size_inches(1 * ratio, 0.618 * ratio)
 
     style = sns.axes_style('darkgrid')

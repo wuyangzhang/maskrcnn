@@ -3,7 +3,6 @@ import pickle
 import struct
 import time
 import signal
-import datetime
 
 
 class RemoteConnector:
@@ -20,11 +19,12 @@ class RemoteConnector:
         self.payload_size = struct.calcsize("L")
         self.e2e_latency = []
         signal.signal(signal.SIGINT, self.signal_handler)
+        self.log = None
 
     def get_avg_latency(self):
         return sum(self.e2e_latency) / len(self.e2e_latency)
 
-    def send(self, data, response, service_id):
+    def send(self, data, response, id):
 
         # send requests
         s1 = time.time()
@@ -35,7 +35,7 @@ class RemoteConnector:
         s1 = time.time()
         #print('data pack in {}'.format(s1-s2))
 
-        print('[client] send data {} in {}'.format(service_id, datetime.datetime.now()))
+        #print('[client] send data {} in {}'.format(service_id, datetime.datetime.now()))
 
         self.socket_TCP.sendall(data)
         s2 = time.time()
@@ -54,26 +54,11 @@ class RemoteConnector:
 
         s1 = time.time()
         bbox = pickle.loads(res)
-        print('[client] receive data {} in {}'.format(service_id, datetime.datetime.now()))
+        print('server processing time,{}'.format(bbox[1]))
+        #print('[client] receive data {} in {}'.format(service_id, datetime.datetime.now()))
 
-        #print('load pickle in {}'.format(time.time()-s1))
-        #print('receive data in {} seconds'.format(time.time() - start))
-        response.append(bbox)
+        response.append(bbox[0])
 
-        # data = []
-        # while len(data) < self.payload_size:
-        #     data.append(self.socket_TCP.recv(self.buffer_size))
-        # packed_msg_size = data[:self.payload_size]
-        # data = data[self.payload_size:]
-        # msg_size = struct.unpack("L", packed_msg_size)[0]
-        # while len(data) < msg_size:
-        #     data.append(self.socket_TCP.recv(self.buffer_size))
-        # res = data[:msg_size]
-        # s1 = time.time()
-        # bbox = pickle.loads(res)
-        # print('load pickle in {}'.format(time.time()-s1))
-        # print('receive data in {}'.format(time.time() - start))
-        # response.append(bbox)
 
 
     def disconnect(self):

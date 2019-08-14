@@ -20,7 +20,7 @@ import torch
 import torch.nn
 import torch.nn.utils.rnn
 from torch.utils.data import Dataset, DataLoader
-from sklearn.model_selection import train_test_split
+#from sklearn.model_selection import train_test_split
 
 
 class RPPNDataset(Dataset):

@@ -1,4 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+import time
 import cv2
 import torch
 from torchvision import transforms as T
@@ -143,7 +144,7 @@ class COCODemo(object):
     ):
         self.cfg = cfg.clone()
         self.model = build_detection_model(cfg)
-        self.model.eval()
+        self.model = self.model.eval()
         self.device = torch.device(cfg.MODEL.DEVICE)
         self.model.to(self.device)
         self.min_image_size = min_image_size
@@ -225,6 +226,7 @@ class COCODemo(object):
         if self.show_mask_heatmaps:
             return self.create_mask_montage(result, top_predictions)
         result = self.overlay_boxes(result, top_predictions)
+
         if self.cfg.MODEL.MASK_ON:
             result = self.overlay_mask(result, top_predictions)
         if self.cfg.MODEL.KEYPOINT_ON:
@@ -245,7 +247,7 @@ class COCODemo(object):
         result = self.overlay_class_names(result, predictions)
         return result
 
-    def compute_prediction(self, original_image, resize=True):
+    def compute_prediction(self, original_image, resize=False):
         """
         Arguments:
             original_image (np.ndarray): an image as returned by OpenCV
@@ -269,7 +271,9 @@ class COCODemo(object):
         image_list = image_list.to(self.device)
         # compute predictions
         with torch.no_grad():
+
             predictions, pondercost, units = self.model(image_list)
+
         predictions = [o.to(self.cpu_device) for o in predictions]
 
         # always single image is passed at a time
@@ -336,7 +340,30 @@ class COCODemo(object):
             top_left, bottom_right = box[:2].tolist(), box[2:].tolist()
 
             image = cv2.rectangle(
-                image, tuple(top_left), tuple(bottom_right), tuple(color), 5
+                image, tuple(top_left), tuple(bottom_right), tuple(color), 3
+            )
+
+        return image
+
+    def overlay_boxes_only(self, image, predictions):
+        """
+        Adds the predicted boxes on top of the image
+
+        Arguments:
+            image (np.ndarray): an image as returned by OpenCV
+            predictions (BoxList): the result of the computation by the model.
+                It should contain the field `labels`.
+        """
+
+        boxes = predictions.bbox
+
+
+        for box in boxes:
+            box = box.to(torch.int64)
+            top_left, bottom_right = box[:2].tolist(), box[2:].tolist()
+
+            image = cv2.rectangle(
+                image, tuple(top_left), tuple(bottom_right), (1, 127, 31), 5
             )
 
         return image

@@ -5,9 +5,7 @@ import socket
 
 # signal.pause()
 
-
-
-class Server():
+class Server:
 
     def __init__(self, server_address, buffer_size=1024 * 1024):
 

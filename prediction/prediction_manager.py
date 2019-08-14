@@ -8,7 +8,7 @@ class PredictionManager:
         self.bbox_queue = list()
         self.max_queue_size = config.window_size
         self.pred_delegator = PredictionDelegator(config)
-
+        self.img = None
         self.next_predict = None
 
     def add_bbox(self, bbox):
@@ -21,19 +21,17 @@ class PredictionManager:
         if len(self.bbox_queue) == self.max_queue_size:
             self.bbox_queue.pop(0)
         self.bbox_queue.append(bbox)
-
-        # the historical results are enough for prediction
-        if len(self.bbox_queue) == self.max_queue_size:
-            self.next_predict = self.predict_bbox_dist()
+        #print(self.bbox_queue)
             # self.next_predict = self.test_predict()
 
     def get_queue_len(self):
         return len(self.bbox_queue)
 
     def is_active(self):
+        #print(self.bbox_queue, self.max_queue_size)
         return len(self.bbox_queue) >= self.max_queue_size
 
-    def predict_bbox_dist(self):
+    def predict_bbox(self):
         '''
         Predict computation cost in pixel level
 
@@ -57,7 +55,10 @@ class PredictionManager:
         :return bbox coordinates
         :return bbox weights
         '''
-        coords, weights = self.next_predict
+
+        self.next_predict = self.predict_bbox()
+        coords = self.next_predict
+        weights = [1] * coords.shape[0]
         return coords, weights
 
     def unit_calculator(self, bbox, units):

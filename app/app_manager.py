@@ -1,7 +1,11 @@
 import argparse
+import threading
 from maskrcnn_benchmark.config import cfg
 from demo.predictor import COCODemo
-from tools.sact_helper import pondercost_proc
+import cv2
+import matplotlib.pyplot as plt
+
+lock = threading.Lock()
 
 
 class ApplicationManager:
@@ -65,25 +69,41 @@ class ApplicationManager:
     def get_cfg(self):
         return self.cfg
 
-    def run(self, img, res=None, resize=True):
+    def run(self, img, res=None, resize=True, display=False):
         '''
         Given each application with SACT, we require it to output 3 results,
         1) final application rendering results
         2) bbox coordinates
         3) bbox computing complexity
         '''
+
         predictions, overhead = self.coco_demo.compute_prediction(img, resize)
+        #print(len(predictions.bbox))
         bbox = self.coco_demo.select_top_predictions(predictions)
-        bbox = pondercost_proc.add_overhead(bbox, overhead, img.shape)
-        # composite = self.coco_demo.overlay_mask(img, bbox)
-        # composite = self.coco_demo.overlay_boxes(img, bbox)
+        composite = self.coco_demo.overlay_boxes(img, bbox)
+        #composite = self.coco_demo.overlay_mask(img, bbox)
+
+        if display:
+            lock.acquire()
+            b, g, r = cv2.split(composite)
+            composite = cv2.merge([r, g, b])
+            plt.imshow(composite)
+            plt.show()
+            lock.release()
+
+        # cv2.imshow("distributed s input", img)
+        # cv2.waitKey(0)
+        #cv2.imshow("distributed s res ", composite)
+        #cv2.waitKey(2)
 
         if res is not None:
             res.append(bbox)
-        return bbox
+        return bbox, composite
 
     def mask_overlay(self, img, mask, dist=False):
         return self.coco_demo.overlay(img, mask, dist)
 
     def rendering(self, img, bbox):
+        #return self.coco_demo.overlay_mask(img, bbox)
         return self.coco_demo.overlay_boxes(img, bbox)
+        #return self.coco_demo.overlay_boxes_only(img, bbox)

@@ -6,11 +6,10 @@ from state_monitor.remote_connector import RemoteConnector
 
 class ControlManager:
 
-    def __init__(self, config, prediction_mgr, partition_mgr, mask_engine):
+    def __init__(self, config, prediction_mgr, partition_mgr):
 
         self.prediction_mgr = prediction_mgr
         self.partition_mgr = partition_mgr
-        self.mask_engine = mask_engine
 
         self.config = config
         self.branch_states = {0: 'cache_refresh', 1: 'distribute', 2: 'shortcut'}
@@ -55,51 +54,18 @@ class ControlManager:
     def dist_jobs(self, partitions):
         self.service_id += 1
         threads = [None] * self.total_remote_servers
-        #self.distributed_res = [[]] * self.total_remote_servers
         self.distributed_res = collections.defaultdict(list)
 
-        #print('distribute the workloads to the servers..')
         for i, sid in enumerate(self.sockets.keys()):
-            #self.time_counter[i].append(time.time())
-
+            #print('offload size,', partitions[i].size)
             threads[i] = threading.Thread(target=self.sockets[sid].send,
                                           args=(partitions[i], self.distributed_res[sid], self.service_id))
 
             threads[i].start()
-            #self.time_counter[i] = time.time() - self.time_counter[i][-1]
 
 
         for id, thread in enumerate(threads):
             thread.join()
-
-        #print('All distributed results are ready.')
-        # if self.use_local:
-        #     local_partition = partitions[0]
-        #     #self.local_composite, bbox, units = self.mask_engine.run(local_partition)
-        #     threads[0] = threading.Thread(target=self.mask_engine.run,
-        #                                   args=(local_partition, results[0]))
-        #     threads[0].start()
-        #
-        #     for i, id in enumerate(self.remote_servers):
-        #         self.time_counter[i].append(time.time())
-        #
-        #         threads[i+1] = threading.Thread(target = self.remote_servers[id].send,
-        #                                         args=(partitions[i+1]))
-        #         threads[i+1].start()
-        #         #bbox, units = self.remote_servers[id].send(partitions[i + 1])
-        #         self.time_counter[i] = time.time() - self.time_counter[i][-1]
-        #         #self.distributed_res.append((bbox, units))
-        # else:
-        #     for i, id in enumerate(self.remote_servers):
-        #         self.time_counter[i].append(time.time())
-        #         threads[i] = threading.Thread(target=self.remote_servers[id].send,
-        #                                       args=(partitions[i], results[i]))
-        #         # bbox, units = self.remote_servers[id].send(partitions[i])
-        #         # self.time_counter[i] = time.time() - self.time_counter[i][-1]
-        #         # self.distributed_res.append((bbox, units))
-
-    # def total_comp_devices(self):
-    #     return self.total_remote_servers if not self.use_local else self.total_remote_servers + 1
 
     def merge_partitions(self):
         """ Merge Partitions

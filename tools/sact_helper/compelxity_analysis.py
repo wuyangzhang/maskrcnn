@@ -17,4 +17,4 @@ def cal_complexity(units):
         tmp = block[1] / layers[block_id]
         tmp = torch.min(tmp.float(), torch.tensor([1.]).cuda())
         tmp = tmp.mean().tolist()
-        mylogger.warn('format:block[x] shows y complexity,{},{}'.format(block_id, tmp))
+        #mylogger.warn('format:block[x] shows y complexity,{},{}'.format(block_id, tmp))

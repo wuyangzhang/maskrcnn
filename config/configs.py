@@ -1,6 +1,9 @@
-class Config:
+from pathlib import Path
 
-    score_threshold = 0.5
+
+class Config:
+    #score_threshold = 0.5
+
     def __init__(self):
         # general
         self.frame_height = None
@@ -8,15 +11,18 @@ class Config:
         self.max_complexity = 50
         self.use_local = True
 
-        self.home_addr = '/home/nvidia/'
+        self.home_addr = str(Path.home())
+
         # self.home_addr = '/home/user/wz1_willRemoveOnJuly31/'
         # dataset
-        self.eval_dataset = 'kitti'
+        self.datasets = ['kitti', 'davis']
+        self.eval_dataset = 'davis'
         # kitti, h: 375, w: 1242
-        self.kitti_video_path = self.home_addr + 'kitty/testing/seq_list.txt'
+        self.kitti_video_path = self.home_addr + '/kitty/testing/seq_list.txt'
+        self.davis_video_path = self.home_addr + '/datasets/davis/DAVIS/JPEGImages/480p/'
 
         # prediction manager
-        self.model_path = self.home_addr + 'maskrcnn-benchmark/prediction/models/' \
+        self.model_path = self.home_addr + '/maskrcnn-benchmark/prediction/models/' \
                                            'lstm_single_checkpoint15.pth'
 
         self.pred_algos = ('lstm', 'convlstm')
@@ -27,12 +33,12 @@ class Config:
         # partition manager
         self.par_num = 2
         self.total_remote_servers = 2
-        self.servers = {0: ('127.0.0.1', 5050), 1: ('127.0.0.1', 5051)}
-
-        # self.servers = {1: ('127.0.0.1', 5050), 2: ('127.0.0.1', 5051),
-        #                 3: ('127.0.0.1', 5052), 4: ('127.0.0.1', 5052)}
+        #self.servers = {0: ('192.168.55.100', 5053), 1: ('192.168.55.100', 5054)}
+        self.servers = {0: ('192.168.55.100', 5051), 1: ('192.168.55.100', 5055)}
 
         self.overlap_threshold = 0.7
 
         # flow control manager
         self.refresh_interval = 10
+
+        self.log = None

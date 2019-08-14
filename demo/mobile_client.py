@@ -1,9 +1,10 @@
 import time
 import threading
+import pickle
+import matplotlib.pyplot as plt
 
 import cv2
 
-from frame_filter import Filter
 from state_monitor import ControlManager
 from partition import PartitionManager
 from prediction import PredictionManager
@@ -13,79 +14,99 @@ from demo.remote_server import Server
 from dataset import MobiDistDataset
 
 
+
 def main():
-    # cam = cv2.VideoCapture(0)
-    app_mgr = ApplicationManager()
-    filter_actor = Filter()
+
+
 
     # init the main components of MobiDist
     config = Config()
+    dataset = MobiDistDataset(config).getDataLoader()
+
+    app_mgr = ApplicationManager()
 
     # launch remote servers, only for the debug purpose
     for i in config.servers:
         print('running remote server {}'.format(i))
-        p = threading.Thread(target=Server, args=(config.servers[i], 1024*1024), daemon=True)
+        p = threading.Thread(target=Server, args=(config.servers[i], 1024 * 1024), daemon=True)
         p.start()
 
-    time.sleep(3)
-    print('wait for launching servers..')
-    dataset = MobiDistDataset(config).getDataLoader()
+    print('wait seconds for launching remote servers..')
+    time.sleep(2)
+
     par_mgr = PartitionManager(config)
     pred_mgr = PredictionManager(config)
-    control_mgr = ControlManager(config, pred_mgr, par_mgr, app_mgr)
+    control_mgr = ControlManager(config, pred_mgr, par_mgr)
 
     e2e_latency = []
-    # while True:
-    for img in dataset:
+
+    res = dict()
+    for id, img in enumerate(dataset):
+
+        if id < 201:
+            continue
+
         img = img[0].numpy()
         if config.frame_width is None:
             config.frame_height, config.frame_width = img.shape[:2]
 
         # counting the time when receiving the frame.
         start_time = time.time()
-        # _, img = cam.read() # shape (480, 640, 3)
 
-        img = filter_actor.filter(img)
         composite = None
 
-        if img is not None:
-            branch = control_mgr.get_branch_state()
-            #branch = 'cache_refresh'
-            if branch == 'distribute':
+        src = img.copy()
+        app_mgr.run(src, display=True)
 
-                coords, weights = pred_mgr.get_pred_bbox()
+        branch = control_mgr.get_branch_state()
 
-                # get computing capability of involved nodes
-                resources = control_mgr.report_resources()
+        if branch == 'distribute':
 
-                # perform frame partition based on computing capability
-                # and computing overheads of jos
-                imgs = par_mgr.frame_partition(img, coords, weights, resources)
+            # for debug
+            src = img.copy()
+            bbox, _ = app_mgr.run(src)
 
-                # offload the partitions to edge servers
-                control_mgr.dist_jobs(imgs)
+            coords, weights = pred_mgr.get_pred_bbox()
 
-                # merge all the results
-                bbox = control_mgr.merge_partitions()
+            # get computing capability of involved nodes
+            resources = control_mgr.report_resources()
 
-                #print('######we have {} box in total#######'.format(len(bbox.bbox)))
+            # perform frame partition based on computing capability
+            # and computing overheads of jos
+            imgs = par_mgr.frame_partition(img, coords, weights, resources)
+
+            # offload the partitions to edge servers
+            control_mgr.dist_jobs(imgs)
+
+            # merge all the results
+            bbox = control_mgr.merge_partitions()
+
+            if bbox:
                 composite = app_mgr.rendering(img, bbox)
-
                 pred_mgr.add_bbox(bbox)
+            else:
+                composite = img
 
-            elif branch == 'cache_refresh':
-                bbox = app_mgr.run(img)
+        elif branch == 'cache_refresh':
+            bbox, _ = app_mgr.run(img)
+            composite = app_mgr.rendering(img, bbox)
+            pred_mgr.add_bbox(bbox)
 
-                pred_mgr.add_bbox(bbox)
+        elif control_mgr.branch_states[branch] == 'shortcut':
+            composite = None
 
+        b, g, r = cv2.split(composite)
+        composite = cv2.merge([r, g, b])
+        plt.imshow(composite)
+        plt.title('distributed{}'.format(id))
+        plt.show()
 
-            elif control_mgr.branch_states[branch] == 'shortcut':
-                composite = None
-
-            #cv2.imshow("COCO detections", composite)
-            #cv2.waitKey(100)
-        else:
-            cv2.imshow("COCO detections", control_mgr.last_composite)
+        res[id] = bbox
+        if id >= 100 and id % 100 == 0:
+            f = open("demo/par_2/kitti_{}.pkl".format(id), "wb")
+            pickle.dump(res, f)
+            f.close()
+            res = dict()
 
         latency = time.time() - start_time
         print("Time: {:.2f} s / img".format(latency))
@@ -93,8 +114,9 @@ def main():
 
         if cv2.waitKey(1) == 27:
             break  # esc to quit
-    cv2.destroyAllWindows()
 
-# 0.12
+
+cv2.destroyAllWindows()
+
 if __name__ == "__main__":
     main()

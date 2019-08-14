@@ -52,6 +52,15 @@ class BoxList(object):
         for k, v in bbox.extra_fields.items():
             self.extra_fields[k] = v
 
+    @staticmethod
+    def get_empty():
+        bb = BoxList(torch.Tensor(0, 4), (1, 1))
+        #tensor([], dtype=torch.int64)
+        bb.extra_fields['labels'] = torch.Tensor().type(dtype=torch.int64)
+        bb.extra_fields['scores'] = torch.Tensor()
+        bb.extra_fields['mask'] = torch.Tensor()
+        return bb
+
     def convert(self, mode):
         if mode not in ("xyxy", "xywh"):
             raise ValueError("mode should be 'xyxy' or 'xywh'")
@@ -127,10 +136,15 @@ class BoxList(object):
         return bbox.convert(self.mode)
 
     def add_offset(self, x, y):
-        self.bbox[:, 0] = self.bbox[:, 0] + y
-        self.bbox[:, 1] = self.bbox[:, 1] + x
-        self.bbox[:, 2] = self.bbox[:, 2] + y
-        self.bbox[:, 3] = self.bbox[:, 3] + x
+        # self.bbox[:, 0] = self.bbox[:, 0] + y
+        # self.bbox[:, 1] = self.bbox[:, 1] + x
+        # self.bbox[:, 2] = self.bbox[:, 2] + y
+        # self.bbox[:, 3] = self.bbox[:, 3] + x
+
+        self.bbox[:, 0] = self.bbox[:, 0] + x
+        self.bbox[:, 1] = self.bbox[:, 1] + y
+        self.bbox[:, 2] = self.bbox[:, 2] + x
+        self.bbox[:, 3] = self.bbox[:, 3] + y
 
     def transpose(self, method):
         """

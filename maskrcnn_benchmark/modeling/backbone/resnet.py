@@ -383,7 +383,7 @@ class ResNet(nn.Module):
         stem_module = _STEM_MODULES[cfg.MODEL.RESNETS.STEM_FUNC]
         stage_specs = _STAGE_SPECS[cfg.MODEL.BACKBONE.CONV_BODY]
         transformation_module = _TRANSFORMATION_MODULES[cfg.MODEL.RESNETS.TRANS_FUNC]
-        self.sact_weight = 0.03
+        self.sact_weight = 0.01
         # Construct the stem module
         self.stem = stem_module(cfg)
 
@@ -455,12 +455,12 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         outputs = []
-        mylogger.info('resnet start')
+        #mylogger.info('resnet start')
         x = self.stem(x)
         ponder_cost_sum = 0
         units = []
         for stage_name in self.stages:
-            mylogger.info('resnet stage {}'.format(stage_name))
+            #mylogger.info('resnet stage {}'.format(stage_name))
             # if stage_name == 'layer1':
             #     block = getattr(self, 'layer1')
             #     print(block.block1.conv4.weight)

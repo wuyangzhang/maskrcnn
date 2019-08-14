@@ -1,18 +1,19 @@
 import os
-import sys
-sys.path.append('/home/nvidia/maskrcnn/')
+
+
+
 import glob
 
 import cv2
 
-from app.app_manager import ApplicationManager
+#from app.app_manager import ApplicationManager
 
 from config import Config
 
 config = Config()
 
-root_dir = config.home_addr + 'kitty/training/image_02/'
-output_dir = config.home_addr + 'kitty/training/seq_list.txt'
+root_dir = config.home_addr + 'kitty/testing/image_02/'
+output_dir = config.home_addr + 'kitty/testing/seq_list.txt'
 
 # from demo.mobile_client import MaskCompute
 
@@ -49,6 +50,7 @@ def cal_bbox(folderpath):
                     f.write(vals + '\n')
     print('finish bbox calculation')
 
+
 def process():
     f = open(output_dir, 'w')
     for video in os.listdir(root_dir):
@@ -62,6 +64,5 @@ def process():
 
     f.close()
 
-
-#cal_bbox(root_dir)
+# cal_bbox(root_dir)
 process()

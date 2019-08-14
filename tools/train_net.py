@@ -5,7 +5,7 @@ Basic training script for PyTorch
 
 # Set up custom environment before nearly anything else is imported
 # NOTE: this should be the first import (no not reorder)
-from maskrcnn_benchmark.utils.env import setup_environment  # noqa F401 isort:skip
+from maskrcnn_benchmark.utils.env import setup_environment
 
 import argparse
 import os
@@ -21,7 +21,6 @@ from maskrcnn_benchmark.modeling.detector import build_detection_model
 from maskrcnn_benchmark.utils.checkpoint import DetectronCheckpointer
 from maskrcnn_benchmark.utils.collect_env import collect_env_info
 from maskrcnn_benchmark.utils.comm import synchronize, get_rank
-from maskrcnn_benchmark.utils.imports import import_file
 from maskrcnn_benchmark.utils.logger import setup_logger
 from maskrcnn_benchmark.utils.miscellaneous import mkdir
 
@@ -36,10 +35,8 @@ except ImportError:
 def train(cfg, local_rank, distributed):
     model = build_detection_model(cfg)
 
-
     device = torch.device(cfg.MODEL.DEVICE)
     model.to(device)
-
 
     optimizer = make_optimizer(cfg, model)
     scheduler = make_lr_scheduler(cfg, optimizer)
@@ -90,6 +87,7 @@ def train(cfg, local_rank, distributed):
     )
 
     return model
+
 
 def run_test(cfg, model, distributed):
     if distributed:
